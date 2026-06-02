@@ -10,7 +10,7 @@ export default function RoastPage() {
   const [roasts, setRoasts] = useState<string[]>([]);
   const [showCard, setShowCard] = useState(false);
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
-  const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild'>('brutal');
+  const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
   const [error, setError] = useState('');
 
@@ -244,7 +244,9 @@ export default function RoastPage() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold mb-4 text-center">Saucy Grok says...</h2>
+              <h2 className="text-2xl font-semibold mb-4 text-center">
+                {vibe === 'uplifting' ? 'Saucy Grok says something nice...' : 'Saucy Grok says...'}
+              </h2>
               <div className="space-y-4">
                 <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast below to create a shareable card with it (includes your photo)</p>
                 {roasts.map((roast, index) => (
@@ -334,13 +336,16 @@ export default function RoastPage() {
                     { value: 'savage', label: 'Savage' },
                     { value: 'playful', label: 'Playful' },
                     { value: 'mild', label: 'Mild' },
+                    { value: 'uplifting', label: 'Uplifting' },
                   ].map((option) => (
                     <button
                       key={option.value}
                       onClick={() => setVibe(option.value as any)}
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                         vibe === option.value
-                          ? 'bg-red-600 text-white'
+                          ? option.value === 'uplifting' 
+                            ? 'bg-emerald-600 text-white' 
+                            : 'bg-red-600 text-white'
                           : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                       }`}
                     >
@@ -385,6 +390,7 @@ export default function RoastPage() {
         <RoastCard
           imageUrl={previewUrl}
           roastText={selectedRoastForCard}
+          isUplifting={vibe === 'uplifting'}
           onClose={() => setShowCard(false)}
         />
       )}

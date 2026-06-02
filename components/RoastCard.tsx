@@ -6,10 +6,11 @@ import { toPng } from 'html-to-image';
 interface RoastCardProps {
   imageUrl: string;
   roastText: string;
+  isUplifting?: boolean;
   onClose?: () => void;
 }
 
-export default function RoastCard({ imageUrl, roastText, onClose }: RoastCardProps) {
+export default function RoastCard({ imageUrl, roastText, isUplifting = false, onClose }: RoastCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = async () => {
@@ -97,8 +98,8 @@ export default function RoastCard({ imageUrl, roastText, onClose }: RoastCardPro
 
           {/* Branding */}
           <div className="mt-auto pt-8 text-center">
-            <p className="text-xs text-zinc-500 tracking-[3px]">ROASTED BY</p>
-            <p className="text-red-500 font-bold text-lg -mt-1">SAUCY GROK</p>
+            <p className="text-xs text-zinc-500 tracking-[3px]">{isUplifting ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
+            <p className={`${isUplifting ? 'text-emerald-500' : 'text-red-500'} font-bold text-lg -mt-1`}>SAUCY GROK</p>
           </div>
         </div>
 
