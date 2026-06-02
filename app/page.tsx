@@ -19,9 +19,23 @@ export default function RoastlyLanding() {
     }
   };
 
-  const handleCheckout = async (priceId: string, mode: "payment" | "subscription" = "payment") => {
+  const handleCheckout = async (priceId: string) => {
     if (!priceId) {
       alert("This product isn't set up yet.");
+      return;
+    }
+
+    const isSubscription = priceId === STRIPE_PRICES.unlimited;
+    const productLabel = isSubscription ? "Unlimited Roasts ($19.99/mo)" : 
+      priceId === STRIPE_PRICES.starter ? "Starter ($0.99)" :
+      priceId === STRIPE_PRICES.popular ? "Popular Pack ($4.99)" :
+      priceId === STRIPE_PRICES.heavy ? "Heavy Roaster ($9.99)" : "selected pack";
+
+    const confirmMessage = `You are about to purchase the ${productLabel}.` + 
+      (isSubscription ? " This will be a recurring monthly charge." : " This is a one-time purchase.") +
+      " Do you want to continue?";
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 
@@ -31,7 +45,7 @@ export default function RoastlyLanding() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, mode }),
+        body: JSON.stringify({ priceId }),
       });
 
       const data = await res.json();
@@ -169,7 +183,7 @@ export default function RoastlyLanding() {
         <div className="text-center mb-12">
           <p className="text-red-400 text-sm tracking-[3px] mb-2">PRICING</p>
           <h2 className="text-5xl font-bold tracking-tighter">Pay only for what you use</h2>
-          <p className="text-xl text-zinc-400 mt-4">No subscriptions required. Buy credits when you need them.</p>
+          <p className="text-xl text-zinc-400 mt-4">One-time packs or the daily Pro option. All purchases unlock 10 roasts/day (capped).</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -195,7 +209,7 @@ export default function RoastlyLanding() {
               <div className="mt-4">
                 <span className="text-5xl font-bold">$0.99</span>
               </div>
-              <p className="text-zinc-400 mt-1">5 roasts</p>
+              <p className="text-zinc-400 mt-1">Unlocks 10 roasts per day</p>
               <p className="text-xs text-zinc-400 mt-1">Baby's first burn</p>
             </div>
             <button
@@ -217,7 +231,7 @@ export default function RoastlyLanding() {
               <div className="mt-4">
                 <span className="text-5xl font-bold">$4.99</span>
               </div>
-              <p className="text-zinc-400 mt-1">25 roasts</p>
+              <p className="text-zinc-400 mt-1">Unlocks 10 roasts per day</p>
               <p className="text-xs text-zinc-400 mt-1">For when you're finally ready to commit to the bit</p>
             </div>
             <button
@@ -236,7 +250,7 @@ export default function RoastlyLanding() {
               <div className="mt-4">
                 <span className="text-5xl font-bold">$9.99</span>
               </div>
-              <p className="text-zinc-400 mt-1">50 roasts</p>
+              <p className="text-zinc-400 mt-1">Unlocks 10 roasts per day</p>
               <p className="text-xs text-zinc-400 mt-1">For people with a lot of enemies (or one very annoying friend)</p>
             </div>
             <button
@@ -248,10 +262,10 @@ export default function RoastlyLanding() {
             </button>
           </div>
 
-          {/* Pro Daily - $19.99/mo */}
+          {/* Unlimited Roasts - $19.99/mo */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col">
             <div>
-              <p className="text-zinc-400 text-sm">PRO DAILY</p>
+              <p className="text-zinc-400 text-sm">UNLIMITED ROASTS</p>
               <div className="mt-4">
                 <span className="text-5xl font-bold">$19.99</span>
                 <span className="text-zinc-400">/mo</span>
@@ -261,17 +275,17 @@ export default function RoastlyLanding() {
               <p className="text-xs text-zinc-400 mt-1">For when being an asshole is your full-time job</p>
             </div>
             <button
-              onClick={() => handleCheckout(STRIPE_PRICES.unlimited, "subscription")}
+              onClick={() => handleCheckout(STRIPE_PRICES.unlimited)}
               disabled={isLoading !== null}
               className="mt-auto w-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50"
             >
-              {isLoading === STRIPE_PRICES.unlimited ? "Processing..." : "Go Pro Daily"}
+              {isLoading === STRIPE_PRICES.unlimited ? "Processing..." : "Get Unlimited"}
             </button>
           </div>
         </div>
 
         <p className="text-center text-xs text-zinc-500 mt-8">
-          All purchases are one-time (except Pro Daily). No hidden fees.
+          Starter/Popular/Heavy are one-time payments. Unlimited Roasts is a recurring monthly subscription. All unlock the 10 roasts/day cap.
         </p>
       </div>
 

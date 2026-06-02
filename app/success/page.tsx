@@ -39,7 +39,11 @@ export default function SuccessPage() {
 
         if (res.ok) {
           setStatus('success');
-          setMessage('Thank you! Your account has been upgraded to Pro Daily (10 roasts per day). The limit is now active on this device.');
+          const label = data.purchaseLabel || 'your purchase';
+          const subNote = data.isSubscription
+            ? ' This is a recurring monthly subscription.'
+            : ' This is a one-time purchase.';
+          setMessage(`Thank you! ${label} activated.${subNote} You now get the paid daily limit: up to 10 roasts per day on this device (instead of the free 3 total).`);
         } else {
           setStatus('error');
           setMessage(data.error || 'We could not activate your paid benefits. Please contact support.');
@@ -59,7 +63,7 @@ export default function SuccessPage() {
         <h1 className="text-4xl font-bold mb-4">Payment Successful!</h1>
 
         {status === 'loading' && (
-          <p className="text-xl text-zinc-400 mb-8">Activating your Pro Daily benefits...</p>
+          <p className="text-xl text-zinc-400 mb-8">Activating your purchase...</p>
         )}
 
         {status === 'success' && (
@@ -78,7 +82,7 @@ export default function SuccessPage() {
         </a>
 
         <p className="text-xs text-zinc-500 mt-6">
-          Pro Daily gives you 10 roasts per day. Limits are tracked per device/browser.
+          Paid plans give you 10 roasts per day (capped). Limits are tracked per device/browser.
         </p>
       </div>
     </div>

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { STRIPE_PRICES } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   try {
-    const { priceId, mode = "payment" } = await request.json();
+    const { priceId } = await request.json();
 
     if (!priceId) {
       return NextResponse.json(
@@ -14,8 +15,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Server is authoritative on mode. Only the exact unlimited price ID creates a recurring subscription.
+    // This prevents any client-side bug or tampering from charging the wrong product (e.g. $0.99 button creating a pro subscription).
+    const mode: "payment" | "subscription" =
+      priceId === STRIPE_PRICES.unlimited ? "subscription" : "payment";
+
     const session = await stripe.checkout.sessions.create({
-      mode: mode as "payment" | "subscription",
+      mode,
       line_items: [
         {
           price: priceId,
@@ -24,7 +30,7 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}`,
-      // Optional: add metadata so we know what was purchased
+      // Store the priceId so mark-paid can tell exactly what was purchased
       metadata: {
         priceId: priceId,
       },
