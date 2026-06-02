@@ -110,12 +110,35 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     ctx.fillText('SAUCY GROK', CARD_WIDTH / 2, CARD_HEIGHT - 100);
 
     // Buried site link at the very bottom of the exported PNG.
-    // This text is baked into the image pixels so it travels with shares
-    // (iMessage, WhatsApp, Instagram stories, texts, etc.) and helps drive
-    // more people back to the site to make money.
+    // Custom Roasty icon (red circle + white R) next to the URL
+    // so the link looks branded/special instead of generic when the image is shared.
+    // This baked-in icon + text travels with the PNG everywhere.
+    const linkY = CARD_HEIGHT - 45;
+    const linkText = 'roasty-app.vercel.app';
     ctx.font = '400 22px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#4b5563'; // zinc-600, subtle / buried
-    ctx.fillText('roastly-app.vercel.app', CARD_WIDTH / 2, CARD_HEIGHT - 45);
+    ctx.fillStyle = '#4b5563';
+    const textW = ctx.measureText(linkText).width;
+    const cx = CARD_WIDTH / 2;
+    const iconR = 8;
+    const iconX = cx - textW / 2 - iconR - 8;
+
+    // Red Roasty badge icon
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(iconX, linkY - 1, iconR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // White R inside icon
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('R', iconX, linkY + 3);
+
+    // URL text
+    ctx.font = '400 22px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#4b5563';
+    ctx.textAlign = 'center';
+    ctx.fillText(linkText, cx, linkY);
 
     return canvas.toDataURL('image/png', 0.95);
   };
