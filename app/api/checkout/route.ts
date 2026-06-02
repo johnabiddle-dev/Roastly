@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 // Vercel redeploy marker for latest clean build (no apiVersion) - ddbff67 + k6iayrgj3
 export async function POST(request: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
   try {
     const { priceId, mode = "payment" } = await request.json();
 
