@@ -277,7 +277,7 @@ export default function RoastPage() {
                 disabled={isGenerating}
                 className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 px-8 py-3 rounded-2xl font-semibold transition-colors"
               >
-                {isGenerating ? "Generating..." : "Regenerate Roasts"}
+                {isGenerating ? "Generating..." : vibe === 'uplifting' ? "Regenerate Positives" : "Regenerate Roasts"}
               </button>
               <button
                 onClick={resetUpload}
