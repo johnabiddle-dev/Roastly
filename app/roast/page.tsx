@@ -286,6 +286,19 @@ export default function RoastPage() {
                 Upload Different Photo
               </button>
             </div>
+
+            {usage && !usage.isPaid && usage.remaining <= 0 && (
+              <div className="text-center mt-4 p-4 bg-zinc-900 rounded-2xl border border-zinc-700">
+                <p className="text-sm text-zinc-400 mb-2">You've used your 3 free roasts total.</p>
+                <a 
+                  href="/" 
+                  className="inline-block bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-2xl font-semibold text-sm transition-colors"
+                >
+                  Buy more roasts →
+                </a>
+                <p className="text-xs text-zinc-500 mt-2">See our paid plans on the main page</p>
+              </div>
+            )}
           </div>
         ) : !previewUrl ? (
           /* Upload Area */
@@ -379,6 +392,17 @@ export default function RoastPage() {
                       : `${usage.remaining} free roasts remaining (3 total)`
                     : "Loading limit..."}
                 </p>
+
+                {usage && !usage.isPaid && usage.remaining <= 0 && (
+                  <div className="mt-3">
+                    <a 
+                      href="/" 
+                      className="text-emerald-400 hover:text-emerald-300 text-sm underline"
+                    >
+                      Buy more roasts on the main page →
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
