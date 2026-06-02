@@ -134,7 +134,15 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
 
     ctx.font = `bold 52px system-ui, -apple-system, sans-serif`;
     ctx.fillStyle = isUplifting ? '#10b981' : '#ef4444'; // emerald or red
+    if (isUplifting) {
+      ctx.shadowColor = '#10b981';
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
     ctx.fillText('SAUCY GROK', CARD_WIDTH / 2, CARD_HEIGHT - 100);
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
 
     // Buried site link at the very bottom of the exported PNG.
     // Custom Roasty icon (red circle + white R) next to the URL
