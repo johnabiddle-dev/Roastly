@@ -274,6 +274,31 @@ export default function RoastlyLanding() {
           All purchases are one-time (except Pro Daily). No hidden fees.
         </p>
       </div>
+
+      {/* Share link section */}
+      <div className="text-center mt-12 pb-12 border-t border-zinc-800 pt-8">
+        <p className="text-zinc-400 mb-2">Want to let friends try it?</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a 
+            href="https://roastly-app.vercel.app" 
+            className="text-red-400 hover:text-red-300 underline text-lg font-medium"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            https://roastly-app.vercel.app
+          </a>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText('https://roastly-app.vercel.app');
+              alert('Link copied! Share it with your friends.');
+            }}
+            className="bg-zinc-800 hover:bg-zinc-700 text-white text-sm px-4 py-2 rounded-2xl transition-colors"
+          >
+            Copy link
+          </button>
+        </div>
+        <p className="text-xs text-zinc-500 mt-2">Friends get 3 free roasts to start — no account needed.</p>
+      </div>
     </div>
   );
 }
