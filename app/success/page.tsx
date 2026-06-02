@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-function SuccessContent() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
+export default function SuccessPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    // Get session_id from URL using client-side method to avoid useSearchParams + Suspense requirement
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+
     if (!sessionId) {
       setStatus('error');
       setMessage('No payment session found.');
@@ -50,7 +51,7 @@ function SuccessContent() {
     };
 
     markAsPaid();
-  }, [sessionId]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center px-6">
@@ -81,13 +82,5 @@ function SuccessContent() {
         </p>
       </div>
     </div>
-  );
-}
-
-export default function SuccessPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Loading...</div>}>
-      <SuccessContent />
-    </Suspense>
   );
 }
