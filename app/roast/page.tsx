@@ -12,8 +12,6 @@ export default function RoastPage() {
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
-  const [error, setError] = useState('');
-
   const getOrCreateBrowserId = () => {
     if (typeof window === "undefined") return "server";
     let id = localStorage.getItem("roastly-browser-id");
@@ -23,6 +21,22 @@ export default function RoastPage() {
     }
     return id;
   };
+
+  const [error, setError] = useState('');
+
+  // For owner testing: append ?resetfree to the /roast URL to reset your free count
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("resetfree")) {
+      const browserId = getOrCreateBrowserId();
+      localStorage.removeItem(`roastly-free-used-${browserId}`);
+      // clean the URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("resetfree");
+      window.history.replaceState({}, "", url.toString());
+      // reload so fresh start with 3 free
+      window.location.reload();
+    }
+  }, []);
 
   // Client-side persistence for free tier limit (so it survives serverless resets)
   const getClientFreeUsed = (browserId: string): number => {
