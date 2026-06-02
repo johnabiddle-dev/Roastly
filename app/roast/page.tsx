@@ -208,7 +208,7 @@ export default function RoastPage() {
                 {usage 
                   ? usage.isPaid 
                     ? `${usage.remaining} roasts left today` 
-                    : `${usage.remaining} free roasts remaining`
+                    : `${usage.remaining} free roasts remaining (3 total)`
                   : ""}
               </div>
               <button
