@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -45,7 +45,7 @@ export default function SuccessPage() {
         }
       } catch (error) {
         setStatus('error');
-        setMessage('Something went wrong while activating your benefits. Please contact support.');
+        setMessage('Something went wrong while activating your paid benefits. Please contact support.');
       }
     };
 
@@ -81,5 +81,13 @@ export default function SuccessPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Loading...</div>}>
+      <SuccessContent />
+    </Suspense>
   );
 }

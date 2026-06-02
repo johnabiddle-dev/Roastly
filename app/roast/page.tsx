@@ -11,7 +11,31 @@ export default function RoastPage() {
   const [showCard, setShowCard] = useState(false);
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild'>('brutal');
-  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number } | null>(null);
+  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
+
+  const getOrCreateBrowserId = () => {
+    if (typeof window === "undefined") return "server";
+    let id = localStorage.getItem("roastly-browser-id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("roastly-browser-id", id);
+    }
+    return id;
+  };
+
+  const fetchUsage = async () => {
+    try {
+      const res = await fetch("/api/usage", {
+        headers: {
+          "x-roastly-browser-id": getOrCreateBrowserId(),
+        },
+      });
+      const data = await res.json();
+      setUsage(data);
+    } catch (e) {
+      console.error("Failed to fetch usage", e);
+    }
+  };
 
   // Fetch usage when component loads
   useEffect(() => {
@@ -98,30 +122,6 @@ export default function RoastPage() {
     setPreviewUrl(null);
     setRoasts([]);
     setUsage(null);
-  };
-
-  const fetchUsage = async () => {
-    try {
-      const res = await fetch("/api/usage", {
-        headers: {
-          "x-roastly-browser-id": getOrCreateBrowserId(),
-        },
-      });
-      const data = await res.json();
-      setUsage(data);
-    } catch (e) {
-      console.error("Failed to fetch usage", e);
-    }
-  };
-
-  const getOrCreateBrowserId = () => {
-    if (typeof window === "undefined") return "server";
-    let id = localStorage.getItem("roastly-browser-id");
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem("roastly-browser-id", id);
-    }
-    return id;
   };
 
   const handleRegenerate = () => {
