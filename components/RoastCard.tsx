@@ -87,7 +87,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     }
 
     // Draw border (darker)
-    ctx.fillStyle = '#1f2937'; // zinc-800 approx
+    ctx.fillStyle = isUplifting ? '#064e3b' : '#1f2937'; // darker for roast, deep emerald tint for uplift
     ctx.fillRect(photoX, photoY, photoWidth + borderWidth * 2, photoHeight + borderWidth * 2);
 
     // Draw the photo (cover)
