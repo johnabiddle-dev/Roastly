@@ -59,6 +59,33 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     const photoX = (CARD_WIDTH - photoWidth - borderWidth * 2) / 2;
     const photoY = 140;
 
+    // Halo / glow for uplifting mode (soft positive aura around the photo)
+    if (isUplifting) {
+      ctx.save();
+      const haloPadding = 35;
+      ctx.shadowColor = '#10b981'; // emerald-500
+      ctx.shadowBlur = 80;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.18)';
+      ctx.fillRect(
+        photoX - haloPadding,
+        photoY - haloPadding,
+        photoWidth + borderWidth * 2 + haloPadding * 2,
+        photoHeight + borderWidth * 2 + haloPadding * 2
+      );
+      // inner softer layer for nicer halo
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+      ctx.fillRect(
+        photoX - haloPadding / 2,
+        photoY - haloPadding / 2,
+        photoWidth + borderWidth * 2 + haloPadding,
+        photoHeight + borderWidth * 2 + haloPadding
+      );
+      ctx.restore();
+    }
+
     // Draw border (darker)
     ctx.fillStyle = '#1f2937'; // zinc-800 approx
     ctx.fillRect(photoX, photoY, photoWidth + borderWidth * 2, photoHeight + borderWidth * 2);
@@ -195,7 +222,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           }}
         >
           {/* Photo */}
-          <div className="w-full max-w-[320px] rounded-2xl overflow-hidden border-4 border-zinc-800 mb-6">
+          <div className={`w-full max-w-[320px] rounded-2xl overflow-hidden mb-6 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 25px rgba(16,185,129,0.35), 0 0 50px rgba(16,185,129,0.15)" } : {}}>
             <img 
               src={imageUrl} 
               alt="Roasted" 
