@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef } from 'react';
-import { toPng } from 'html-to-image';
 
 interface RoastCardProps {
   imageUrl: string;
@@ -110,6 +109,14 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     ctx.fillStyle = isUplifting ? '#10b981' : '#ef4444'; // emerald or red
     ctx.fillText('SAUCY GROK', CARD_WIDTH / 2, CARD_HEIGHT - 100);
 
+    // Buried site link at the very bottom of the exported PNG.
+    // This text is baked into the image pixels so it travels with shares
+    // (iMessage, WhatsApp, Instagram stories, texts, etc.) and helps drive
+    // more people back to the site to make money.
+    ctx.font = '400 22px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#4b5563'; // zinc-600, subtle / buried
+    ctx.fillText('roastly-app.vercel.app', CARD_WIDTH / 2, CARD_HEIGHT - 45);
+
     return canvas.toDataURL('image/png', 0.95);
   };
 
@@ -183,7 +190,8 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           {/* Branding */}
           <div className="mt-auto pt-8 text-center">
             <p className="text-xs text-zinc-500 tracking-[3px]">{isUplifting ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
-            <p className={`${isUplifting ? 'text-emerald-500' : 'text-red-500'} font-bold text-lg -mt-1`}>SAUCY GROK</p>
+            <p className={`${isUplifting ? "text-emerald-500" : "text-red-500"} font-bold text-lg -mt-1`}>SAUCY GROK</p>
+            <p className="text-[10px] text-zinc-600 mt-1 tracking-normal">roastly-app.vercel.app</p>
           </div>
         </div>
 
