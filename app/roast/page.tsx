@@ -12,6 +12,7 @@ export default function RoastPage() {
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild'>('brutal');
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
+  const [error, setError] = useState('');
 
   const getOrCreateBrowserId = () => {
     if (typeof window === "undefined") return "server";
@@ -21,6 +22,44 @@ export default function RoastPage() {
       localStorage.setItem("roastly-browser-id", id);
     }
     return id;
+  };
+
+  // Resize and convert image to JPEG base64 for reliable sending (especially from mobile/HEIC)
+  const resizeAndConvertToBase64 = (file: File, maxSize = 1024): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = Math.round(height * (maxSize / width));
+              width = maxSize;
+            } else {
+              width = Math.round(width * (maxSize / height));
+              height = maxSize;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            const base64 = dataUrl.split(",")[1];
+            resolve(base64);
+          } else {
+            reject(new Error("Canvas context not available"));
+          }
+        };
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
   };
 
   const fetchUsage = async () => {
@@ -45,6 +84,7 @@ export default function RoastPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setError("");
       setSelectedFile(file);
       
       // Create preview
@@ -62,8 +102,10 @@ export default function RoastPage() {
     setIsGenerating(true);
 
     try {
-      // Convert image to base64
-      const base64 = await fileToBase64(selectedFile);
+      setError("");
+
+      // Resize and convert image to JPEG base64 (better for mobile/HEIC/large photos)
+      const base64 = await resizeAndConvertToBase64(selectedFile);
 
       const response = await fetch("/api/generate-roast", {
         method: "POST",
@@ -80,17 +122,17 @@ export default function RoastPage() {
       const data = await response.json();
 
       if (data.error) {
-        alert(data.error);
+        setError(data.error);
       } else if (data.roasts && data.roasts.length > 0) {
         setRoasts(data.roasts);
         // Server already consumed one roast (enforced in /api/generate-roast). Refresh display count.
         await fetchUsage();
       } else {
-        alert("No roasts were generated. Try again.");
+        setError("No roasts were generated. Try again.");
       }
     } catch (error) {
       console.error(error);
-      alert("Something went wrong while generating roasts.");
+      setError("Something went wrong while generating roasts.");
     } finally {
       setIsGenerating(false);
     }
@@ -116,6 +158,7 @@ export default function RoastPage() {
     setPreviewUrl(null);
     setRoasts([]);
     setUsage(null);
+    setError("");
   };
 
   const handleRegenerate = () => {
@@ -258,6 +301,11 @@ export default function RoastPage() {
               </div>
 
               <div className="text-center">
+                {error && (
+                  <p className="text-red-400 text-sm mb-4 bg-red-950/50 p-3 rounded-xl">
+                    {error}
+                  </p>
+                )}
                 <button
                   onClick={handleGetRoasted}
                   disabled={isGenerating || Boolean(usage && usage.remaining <= 0)}
