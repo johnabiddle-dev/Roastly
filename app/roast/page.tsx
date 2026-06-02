@@ -246,10 +246,15 @@ export default function RoastPage() {
             <div>
               <h2 className="text-2xl font-semibold mb-4 text-center">Saucy Grok says...</h2>
               <div className="space-y-4">
+                <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast below to create a shareable card with it (includes your photo)</p>
                 {roasts.map((roast, index) => (
                   <div 
                     key={index} 
-                    className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-lg"
+                    onClick={() => {
+                      setSelectedRoastForCard(roast);
+                      setShowCard(true);
+                    }}
+                    className="bg-zinc-900 border border-zinc-800 hover:border-red-600 cursor-pointer rounded-2xl p-5 text-lg transition-colors active:bg-zinc-800"
                   >
                     {roast}
                   </div>
@@ -271,15 +276,6 @@ export default function RoastPage() {
                 className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 px-8 py-3 rounded-2xl font-semibold transition-colors"
               >
                 {isGenerating ? "Generating..." : "Regenerate Roasts"}
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedRoastForCard(roasts[0]);
-                  setShowCard(true);
-                }}
-                className="bg-white text-black hover:bg-zinc-200 px-8 py-3 rounded-2xl font-semibold transition-colors"
-              >
-                Create Shareable Card
               </button>
               <button
                 onClick={resetUpload}

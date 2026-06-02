@@ -16,18 +16,54 @@ export default function RoastCard({ imageUrl, roastText, onClose }: RoastCardPro
     if (!cardRef.current) return;
 
     try {
+      // Ensure the photo image is fully loaded/decoded before capturing
+      // This fixes cases where the photo appears as black/blank in the exported image
+      const imgEl = cardRef.current.querySelector('img');
+      if (imgEl instanceof HTMLImageElement) {
+        try {
+          await imgEl.decode();
+        } catch {
+          // proceed even if decode fails
+        }
+      }
+
       const dataUrl = await toPng(cardRef.current, {
         quality: 0.95,
         pixelRatio: 2, // Higher quality
       });
 
-      const link = document.createElement('a');
-      link.download = 'roasted.png';
-      link.href = dataUrl;
-      link.click();
-    } catch (error) {
-      console.error('Failed to generate image:', error);
-      alert('Something went wrong while creating the image. Try again.');
+      // Convert data URL to a proper File so we can use Web Share API
+      const arr = dataUrl.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const file = new File([u8arr], 'roasted.png', { type: mime });
+
+      // On iPhone (and modern mobile), use the native share sheet — this lets them
+      // choose "Save to Photos" directly instead of going to the Downloads folder.
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Roasted by Saucy Grok',
+          text: roastText,
+        });
+      } else {
+        // Desktop fallback (or older browsers)
+        const link = document.createElement('a');
+        link.download = 'roasted.png';
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (error: any) {
+      // Ignore user-cancelled share sheet (AbortError)
+      if (error?.name !== 'AbortError') {
+        console.error('Failed to generate image:', error);
+        alert('Something went wrong while creating the image. Try again.');
+      }
     }
   };
 
