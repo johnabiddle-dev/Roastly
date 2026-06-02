@@ -69,6 +69,7 @@ export default function RoastPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-roastly-browser-id": getOrCreateBrowserId(),
         },
         body: JSON.stringify({
           imageBase64: base64,
@@ -82,14 +83,7 @@ export default function RoastPage() {
         alert(data.error);
       } else if (data.roasts && data.roasts.length > 0) {
         setRoasts(data.roasts);
-        // Increment usage after successful generation
-        await fetch("/api/usage", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-roastly-browser-id": getOrCreateBrowserId(),
-          },
-        });
+        // Server already consumed one roast (enforced in /api/generate-roast). Refresh display count.
         await fetchUsage();
       } else {
         alert("No roasts were generated. Try again.");
@@ -266,7 +260,7 @@ export default function RoastPage() {
               <div className="text-center">
                 <button
                   onClick={handleGetRoasted}
-                  disabled={isGenerating || (usage && usage.remaining <= 0)}
+                  disabled={isGenerating || Boolean(usage && usage.remaining <= 0)}
                   className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 transition-colors text-white text-xl font-semibold px-12 py-4 rounded-2xl"
                 >
                   {usage && usage.remaining <= 0 

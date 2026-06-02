@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { markUserAsPaid } from "@/lib/usage";
+import { markUserAsPaid, makeUserId } from "@/lib/usage";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Browser ID required" }, { status: 400 });
     }
 
-    const userId = `${ip}:${browserId}`;
+    const userId = makeUserId(ip, browserId);
 
     // Mark this browser/IP as paid (gives them 10/day instead of free 3 total)
     markUserAsPaid(userId);

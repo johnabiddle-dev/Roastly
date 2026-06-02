@@ -180,12 +180,12 @@ export default function RoastlyLanding() {
               <div className="mt-4">
                 <span className="text-5xl font-bold">$0</span>
               </div>
-              <p className="text-zinc-400 mt-1">4 roasts to start</p>
+              <p className="text-zinc-400 mt-1">3 roasts to start</p>
               <p className="text-xs text-zinc-400 mt-1">The participation trophy of roasting</p>
             </div>
-            <button className="mt-auto w-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold">
+            <a href="/roast" className="mt-auto w-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold text-center inline-block">
               Get Started Free
-            </button>
+            </a>
           </div>
 
           {/* Starter - $0.99 */}

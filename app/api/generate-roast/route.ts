@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserId, getUsage, consumeOneRoast } from "@/lib/usage";
 
 // Very basic in-memory rate limiter (max 5 roast generations per minute per identifier)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -39,6 +40,22 @@ export async function POST(request: NextRequest) {
     if (!checkRateLimit(rateKey)) {
       return NextResponse.json(
         { error: "You're generating roasts too quickly. Please wait a minute." },
+        { status: 429 }
+      );
+    }
+
+    // Enforce per-user daily/total caps (free=3 lifetime, paid=10/day) BEFORE hitting xAI (to avoid wasting API calls)
+    const userId = getUserId(request);
+    const preStatus = getUsage(userId);
+    if (preStatus.remaining <= 0) {
+      return NextResponse.json(
+        {
+          error: preStatus.isPaid ? "Daily limit reached" : "Free limit reached (3 total)",
+          used: preStatus.used,
+          remaining: preStatus.remaining,
+          limit: preStatus.limit,
+          isPaid: preStatus.isPaid,
+        },
         { status: 429 }
       );
     }
@@ -161,6 +178,14 @@ Rules:
         { error: "Failed to parse roast results" },
         { status: 500 }
       );
+    }
+
+    // Consume the roast quota only after we successfully got results from the AI.
+    // (If a race with another request crossed the limit during the AI call, we still deliver
+    // the roast the user waited for; slight overage possible but rare.)
+    const consumeRes = consumeOneRoast(userId);
+    if (!consumeRes.allowed) {
+      console.log("[generate-roast] Race condition: delivered roast after limit crossed for user", userId);
     }
 
     return NextResponse.json({
