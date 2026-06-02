@@ -24,6 +24,19 @@ export default function RoastPage() {
     return id;
   };
 
+  // Client-side persistence for free tier limit (so it survives serverless resets)
+  const getClientFreeUsed = (browserId: string): number => {
+    if (typeof window === "undefined") return 0;
+    const key = `roastly-free-used-${browserId}`;
+    return parseInt(localStorage.getItem(key) || "0", 10);
+  };
+
+  const setClientFreeUsed = (browserId: string, used: number) => {
+    if (typeof window === "undefined") return;
+    const key = `roastly-free-used-${browserId}`;
+    localStorage.setItem(key, used.toString());
+  };
+
   // Resize and convert image to JPEG base64 for reliable sending (especially from mobile/HEIC)
   const resizeAndConvertToBase64 = (file: File, maxSize = 1024): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -70,7 +83,24 @@ export default function RoastPage() {
         },
       });
       const data = await res.json();
-      setUsage(data);
+      const browserId = getOrCreateBrowserId();
+
+      if (data && !data.isPaid) {
+        const clientUsed = getClientFreeUsed(browserId);
+        if (clientUsed > (data.used || 0)) {
+          const remaining = Math.max(0, 3 - clientUsed);
+          setUsage({
+            ...data,
+            used: clientUsed,
+            remaining,
+          });
+        } else {
+          setClientFreeUsed(browserId, data.used || 0);
+          setUsage(data);
+        }
+      } else {
+        setUsage(data);
+      }
     } catch (e) {
       console.error("Failed to fetch usage", e);
     }
@@ -78,6 +108,18 @@ export default function RoastPage() {
 
   // Fetch usage when component loads
   useEffect(() => {
+    // Optimistically set from client storage so limit shows immediately even before server responds
+    const browserId = getOrCreateBrowserId();
+    const clientUsed = getClientFreeUsed(browserId);
+    if (clientUsed > 0) {
+      const remaining = Math.max(0, 3 - clientUsed);
+      setUsage({
+        used: clientUsed,
+        remaining,
+        limit: 3,
+        isPaid: false,
+      });
+    }
     fetchUsage();
   }, []);
 
@@ -104,6 +146,16 @@ export default function RoastPage() {
     try {
       setError("");
 
+      const browserId = getOrCreateBrowserId();
+      const clientUsed = getClientFreeUsed(browserId);
+
+      // Client-side check for free limit (in case server forgot due to serverless)
+      if (!usage?.isPaid && clientUsed >= 3) {
+        setError("Free limit reached (3 total)");
+        setIsGenerating(false);
+        return;
+      }
+
       // Resize and convert image to JPEG base64 (better for mobile/HEIC/large photos)
       const base64 = await resizeAndConvertToBase64(selectedFile);
 
@@ -125,6 +177,8 @@ export default function RoastPage() {
         setError(data.error);
       } else if (data.roasts && data.roasts.length > 0) {
         setRoasts(data.roasts);
+        // Update client-side count
+        setClientFreeUsed(browserId, clientUsed + 1);
         // Server already consumed one roast (enforced in /api/generate-roast). Refresh display count.
         await fetchUsage();
       } else {
