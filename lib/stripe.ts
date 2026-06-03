@@ -22,9 +22,7 @@ export const STRIPE_PRICES = {
   unlimited: "price_1TdtxcC5AToDgG5NYt3wKgnX",
 
   // Custom Prompts / Create Your Own Prompt - $1.99 one-time add-on
-  // IMPORTANT: Create this product in Stripe first:
-  // - Product name: "Custom Prompts" or "Create Your Own Prompt"
-  // - Price: $1.99, one-time (not recurring)
-  // - Then copy the price_ ID below
-  customPrompts: "price_1TdtxcC5AToDgG5NREPLACE_WITH_YOUR_1_99_PRICE_ID",
+  // This unlocks the custom prompt textarea (write your own instructions for the AI).
+  // Works on top of any paid tier (Starter/Popular/Heavy/Unlimited).
+  customPrompts: "price_1TeFlxC5AToDgG5NrrGP1pcE",
 };
