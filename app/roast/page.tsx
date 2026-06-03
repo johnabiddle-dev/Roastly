@@ -13,7 +13,7 @@ export default function RoastPage() {
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean; bonusRoasts?: number; referredBy?: string } | null>(null);
+  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean; bonusRoasts?: number; referredBy?: string; debug?: any } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
 
@@ -347,6 +347,12 @@ export default function RoastPage() {
                         ? `${usage.remaining} roasts left today` 
                         : `${usage.remaining} free roasts remaining (3 total)`)
                   : ""}
+
+                {usage && usage.debug && (
+                  <div className="text-[8px] text-zinc-500 mt-1 break-all">
+                    debug: received={usage.debug.receivedBrowserId} env={usage.debug.ownerEnv} match={usage.debug.matchesOwner ? 'yes' : 'no'}
+                  </div>
+                )}
               </div>
               <button
                 onClick={handleRegenerate}
@@ -505,6 +511,12 @@ export default function RoastPage() {
                       : `${usage.remaining} free roasts remaining (3 total)`
                     : "Loading limit..."}
                 </p>
+
+                {usage && usage.debug && (
+                  <div className="text-[8px] text-zinc-500 mt-1 break-all">
+                    debug: received={usage.debug.receivedBrowserId} env={usage.debug.ownerEnv} match={usage.debug.matchesOwner ? 'yes' : 'no'}
+                  </div>
+                )}
 
                 {usage && usage.remaining <= 0 && (
                   <div className="mt-3">

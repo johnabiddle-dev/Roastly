@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
 
   const status = getUsage(userId);
 
-  // Temporary debug for owner unlimited troubleshooting
   const receivedBrowserId = req.headers.get("x-roastly-browser-id") || "no-id";
   const ownerEnv = process.env.OWNER_BROWSER_ID || '';
 
