@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import RoastCard from '@/components/RoastCard';
-import { track } from "@vercel/analytics";
 
 export default function RoastPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -169,7 +168,6 @@ export default function RoastPage() {
       // Client-side check for free limit (in case server forgot due to serverless)
       if (!usage?.isPaid && clientUsed >= 3) {
         setError("Free limit reached (3 total)");
-        track('free_limit_reached');
         setIsGenerating(false);
         return;
       }
@@ -195,7 +193,6 @@ export default function RoastPage() {
         setError(data.error);
       } else if (data.roasts && data.roasts.length > 0) {
         setRoasts(data.roasts);
-        track('roast_generated', { vibe });
         // Update client-side count
         setClientFreeUsed(browserId, clientUsed + 1);
         // Server already consumed one roast (enforced in /api/generate-roast). Refresh display count.

@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { track } from "@vercel/analytics";
 import { STRIPE_PRICES } from '@/lib/stripe';
 
 export default function RoastlyLanding() {
@@ -41,7 +40,6 @@ export default function RoastlyLanding() {
     }
 
     setIsLoading(priceId);
-    track('checkout_started', { pack: priceId === STRIPE_PRICES.unlimited ? 'unlimited' : priceId });
 
     try {
       const res = await fetch("/api/checkout", {
