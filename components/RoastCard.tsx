@@ -12,6 +12,8 @@ interface RoastCardProps {
 export default function RoastCard({ imageUrl, roastText, isUplifting = false, onClose }: RoastCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
+  const SITE_URL = 'https://roastly-app.vercel.app';
+
   // Generate the card image using canvas for maximum reliability (especially the photo on mobile)
   const generateCardImage = async (): Promise<string> => {
     const CARD_WIDTH = 1080;
@@ -151,7 +153,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     const ctaY = CARD_HEIGHT - 58;
     const domainY = CARD_HEIGHT - 36;
     const ctaText = 'click here to roast back';
-    const domainText = 'roastly-app.vercel.app';
+    const domainText = SITE_URL.replace('https://', '');
 
     ctx.font = '400 22px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#4b5563';
@@ -184,6 +186,15 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     ctx.textAlign = 'center';
     ctx.fillText(domainText, cx, domainY);
 
+    // Subtle underline to hint that the domain is a link (even though it's a static PNG)
+    const domainW = ctx.measureText(domainText).width;
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - domainW / 2, domainY + 4);
+    ctx.lineTo(cx + domainW / 2, domainY + 4);
+    ctx.stroke();
+
     return canvas.toDataURL('image/png', 0.95);
   };
 
@@ -205,18 +216,30 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
       }
       const file = new File([u8arr], 'roasted.png', { type: mime });
 
+      const shareText = `${roastText}\n\n👉 Click here to roast back: ${SITE_URL}`;
+
       // Prefer native share sheet on mobile (Save to Photos is easy)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: isUplifting ? 'Uplifted by Saucy Grok' : 'Roasted by Saucy Grok',
-          text: roastText,
+          text: shareText,
         });
       } else {
         const link = document.createElement('a');
         link.download = 'roasted.png';
         link.href = dataUrl;
         link.click();
+
+        // On desktop / when share sheet isn't available, also copy the real link
+        // so the user can paste it somewhere (the image itself is just pixels).
+        try {
+          await navigator.clipboard.writeText(SITE_URL);
+          alert('Image downloaded as roasted.png.\n\nThe link was also copied to your clipboard:\n' + SITE_URL);
+        } catch {
+          // Clipboard may be blocked; still let them know the link
+          alert('Image downloaded as roasted.png.\n\nVisit ' + SITE_URL + ' to roast back.');
+        }
       }
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
@@ -276,6 +299,24 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
             className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-2xl font-semibold transition-colors"
           >
             Download Image
+          </button>
+        </div>
+
+        {/* Separate easy way to get the live link (the text in the image is just pixels) */}
+        <div className="bg-zinc-900 pb-5 text-center">
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(SITE_URL);
+                alert('Link copied to clipboard!\n' + SITE_URL);
+              } catch {
+                // Fallback for strict browsers
+                window.prompt('Copy this link:', SITE_URL);
+              }
+            }}
+            className="text-xs text-zinc-400 hover:text-zinc-200 underline active:text-white"
+          >
+            Copy link to roast back
           </button>
         </div>
       </div>
