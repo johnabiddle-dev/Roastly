@@ -121,21 +121,8 @@ export default function RoastPage() {
 
   // Fetch usage when component loads
   useEffect(() => {
-    // Optimistically set from client storage so limit shows immediately even before server responds
-    const browserId = getOrCreateBrowserId();
-    const clientUsed = getClientFreeUsed(browserId);
-    if (clientUsed > 0) {
-      const remaining = Math.max(0, 3 - clientUsed);
-      setUsage({
-        used: clientUsed,
-        remaining,
-        limit: 3,
-        isPaid: false,
-        hasCustomPrompts: false,
-      });
-    }
-
     // Capture referral if present in URL (for growth / getting more users)
+    const browserId = getOrCreateBrowserId();
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       const ref = url.searchParams.get("ref");
@@ -350,9 +337,11 @@ export default function RoastPage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4">
               <div className="text-xs sm:text-sm text-zinc-400 self-center text-center sm:text-left">
                 {usage 
-                  ? usage.isPaid 
-                    ? `${usage.remaining} roasts left today` 
-                    : `${usage.remaining} free roasts remaining (3 total)`
+                  ? (usage.remaining > 100000 
+                      ? "Unlimited (owner)" 
+                      : usage.isPaid 
+                        ? `${usage.remaining} roasts left today` 
+                        : `${usage.remaining} free roasts remaining (3 total)`)
                   : ""}
               </div>
               <button
@@ -508,7 +497,7 @@ export default function RoastPage() {
                 <p className="text-xs text-zinc-500 mt-3">
                   {usage 
                     ? usage.isPaid 
-                      ? `${usage.remaining} roasts left today` 
+                      ? (usage.remaining > 100000 ? "Unlimited (owner)" : `${usage.remaining} roasts left today`) 
                       : `${usage.remaining} free roasts remaining (3 total)`
                     : "Loading limit..."}
                 </p>
