@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Gate custom prompts to paid users only (enforced server-side)
-    if (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() && !preStatus.isPaid) {
+    // Gate custom prompts to users who purchased the $1.99 add-on (on top of a paid tier)
+    if (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() && !preStatus.hasCustomPrompts) {
       return NextResponse.json(
-        { error: "Custom prompts are available for paid users only. Please upgrade." },
+        { error: "Custom prompts require the $1.99 one-time add-on. Please purchase it from the upgrade options." },
         { status: 402 }
       );
     }
