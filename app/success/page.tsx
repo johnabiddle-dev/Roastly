@@ -92,6 +92,11 @@ export default function SuccessPage() {
           Back to Roastly
         </a>
 
+        <div className="mt-6 p-3 bg-zinc-900 rounded-xl text-xs text-zinc-400">
+          <p className="mb-1">Want more users (and bonus roasts)?</p>
+          <a href="/roast" className="text-emerald-400 underline">Go roast something and copy your referral link</a>
+        </div>
+
         <p className="text-xs text-zinc-500 mt-6">
           Paid plans give you 10 roasts per day (capped). Limits are tracked per device/browser.
         </p>
