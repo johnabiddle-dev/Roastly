@@ -16,24 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   const status = getUsage(userId);
-
-  const receivedBrowserId = req.headers.get("x-roastly-browser-id") || "no-id";
-  const ownerEnv = process.env.OWNER_BROWSER_ID || '';
-
-  const cleanReceived = receivedBrowserId.trim();
-  const cleanOwner = ownerEnv.trim();
-
-  return NextResponse.json({
-    ...status,
-    debug: {
-      receivedBrowserId,
-      ownerEnv,
-      receivedLength: receivedBrowserId.length,
-      ownerLength: ownerEnv.length,
-      matchesOwner: cleanReceived === cleanOwner && !!cleanOwner,
-      cleanMatch: cleanReceived === cleanOwner,
-    }
-  });
+  return NextResponse.json(status);
 }
 
 export async function POST(req: NextRequest) {
