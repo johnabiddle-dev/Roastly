@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
         remaining: result.remaining,
         limit: result.limit,
         isPaid: result.isPaid,
+        hasCustomPrompts: result.hasCustomPrompts,
       },
       { status: 429 }
     );
@@ -29,5 +30,6 @@ export async function POST(req: NextRequest) {
     remaining: result.remaining,
     limit: result.limit,
     isPaid: result.isPaid,
+    hasCustomPrompts: result.hasCustomPrompts,
   });
 }

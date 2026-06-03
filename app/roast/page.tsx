@@ -13,7 +13,7 @@ export default function RoastPage() {
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
+  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
 
@@ -139,6 +139,7 @@ export default function RoastPage() {
         remaining,
         limit: 3,
         isPaid: false,
+        hasCustomPrompts: false,
       });
     }
     fetchUsage();
@@ -441,10 +442,10 @@ export default function RoastPage() {
                 </div>
               </div>
 
-              {/* Custom prompt - paid only perk. Free users see a teaser that opens the upgrade modal. */}
-              {usage?.isPaid ? (
+              {/* Custom prompt - unlocked via the $1.99 add-on (available on top of any paid tier) */}
+              {usage?.hasCustomPrompts ? (
                 <div>
-                  <p className="text-sm text-emerald-400 mb-1 text-center">Custom instructions (paid perk)</p>
+                  <p className="text-sm text-emerald-400 mb-1 text-center">Custom instructions (paid add-on)</p>
                   <textarea
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
@@ -459,7 +460,7 @@ export default function RoastPage() {
                     onClick={() => setShowUpgradeModal(true)}
                     className="text-xs text-emerald-400 hover:text-emerald-300 underline"
                   >
-                    Unlock custom prompts (write your own instructions) →
+                    Unlock custom prompts for $1.99 (one-time add-on) →
                   </button>
                 </div>
               )}
@@ -591,6 +592,23 @@ export default function RoastPage() {
               One-time packs unlock the 10-roast daily cap on this browser/device. Unlimited Roasts is a recurring monthly subscription.
             </p>
 
+            {/* $1.99 Custom Prompts Add-on (available on top of any paid tier) */}
+            <div className="mb-4 p-3 bg-zinc-950 border border-emerald-600 rounded-2xl text-left">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-emerald-400">Create Your Own Prompt — $1.99 one-time</div>
+                  <div className="text-xs text-zinc-400">Unlock the custom instructions box. Works with Starter, Popular, Heavy, or Unlimited.</div>
+                </div>
+                <button
+                  onClick={() => handleCheckout(STRIPE_PRICES.customPrompts)}
+                  disabled={isCheckingOut !== null}
+                  className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isCheckingOut === STRIPE_PRICES.customPrompts ? "..." : "Buy Add-on"}
+                </button>
+              </div>
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowUpgradeModal(false)}
@@ -605,10 +623,6 @@ export default function RoastPage() {
                 Close
               </button>
             </div>
-
-            <p className="mt-4 text-[10px] text-emerald-400">
-              Paid users also unlock custom prompts — write your own instructions for the AI roast.
-            </p>
           </div>
         </div>
       )}

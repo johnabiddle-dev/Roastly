@@ -40,10 +40,14 @@ export default function SuccessPage() {
         if (res.ok) {
           setStatus('success');
           const label = data.purchaseLabel || 'your purchase';
-          const subNote = data.isSubscription
-            ? ' This is a recurring monthly subscription.'
-            : ' This is a one-time purchase.';
-          setMessage(`Thank you! ${label} activated.${subNote} You now get the paid daily limit: up to 10 roasts per day on this device (instead of the free 3 total).`);
+          if (data.isCustomPromptsAddOn) {
+            setMessage(`Thank you! ${label} activated. You can now use "Create Your Own Prompt" (write custom instructions for the AI) on any paid tier.`);
+          } else {
+            const subNote = data.isSubscription
+              ? ' This is a recurring monthly subscription.'
+              : ' This is a one-time purchase.';
+            setMessage(`Thank you! ${label} activated.${subNote} You now get the paid daily limit: up to 10 roasts per day on this device (instead of the free 3 total).`);
+          }
         } else {
           setStatus('error');
           setMessage(data.error || 'We could not activate your paid benefits. Please contact support.');

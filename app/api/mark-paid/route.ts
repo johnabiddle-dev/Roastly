@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { markUserAsPaid, makeUserId } from "@/lib/usage";
+import { markUserAsPaid, markCustomPromptsUnlocked, makeUserId } from "@/lib/usage";
 import { STRIPE_PRICES } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
@@ -32,12 +32,21 @@ export async function POST(request: NextRequest) {
 
     // Mark this browser/IP as paid (gives them 10/day instead of free 3 total)
     // All paid products (one-time packs + pro sub) unlock the daily cap for now.
-    markUserAsPaid(userId);
+    const purchasedPriceId = (session.metadata?.priceId as string) || "";
+
+    if (purchasedPriceId === STRIPE_PRICES.customPrompts) {
+      // This is the add-on only
+      markCustomPromptsUnlocked(userId);
+    } else {
+      // Main paid tiers unlock the daily cap
+      markUserAsPaid(userId);
+      // If they also bought a main tier, we could also unlock custom, but user wants extra $1.99
+    }
 
     // Figure out exactly what the user bought so the success page can show accurate text
-    const purchasedPriceId = (session.metadata?.priceId as string) || "";
     let purchaseLabel = "your purchase";
     let isSubscription = false;
+    let isCustomPromptsAddOn = false;
 
     if (purchasedPriceId === STRIPE_PRICES.starter) {
       purchaseLabel = "Starter ($0.99)";
@@ -48,12 +57,16 @@ export async function POST(request: NextRequest) {
     } else if (purchasedPriceId === STRIPE_PRICES.unlimited) {
       purchaseLabel = "Unlimited Roasts ($19.99/mo)";
       isSubscription = true;
+    } else if (purchasedPriceId === STRIPE_PRICES.customPrompts) {
+      purchaseLabel = "Custom Prompts ($1.99)";
+      isCustomPromptsAddOn = true;
     }
 
     return NextResponse.json({
       success: true,
       purchaseLabel,
       isSubscription,
+      isCustomPromptsAddOn,
     });
   } catch (error: any) {
     console.error("Mark paid error:", error);

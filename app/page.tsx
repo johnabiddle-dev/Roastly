@@ -29,7 +29,8 @@ export default function RoastlyLanding() {
     const productLabel = isSubscription ? "Unlimited Roasts ($19.99/mo)" : 
       priceId === STRIPE_PRICES.starter ? "Starter ($0.99)" :
       priceId === STRIPE_PRICES.popular ? "Popular Pack ($4.99)" :
-      priceId === STRIPE_PRICES.heavy ? "Heavy Roaster ($9.99)" : "selected pack";
+      priceId === STRIPE_PRICES.heavy ? "Heavy Roaster ($9.99)" :
+      priceId === STRIPE_PRICES.customPrompts ? "Custom Prompts ($1.99)" : "selected pack";
 
     const confirmMessage = `You are about to purchase the ${productLabel}.` + 
       (isSubscription ? " This will be a recurring monthly charge." : " This is a one-time purchase.") +
@@ -286,6 +287,7 @@ export default function RoastlyLanding() {
 
         <p className="text-center text-xs text-zinc-500 mt-8">
           Starter/Popular/Heavy are one-time payments. Unlimited Roasts is a recurring monthly subscription. All unlock the 10 roasts/day cap.
+          <br />Add "Create Your Own Prompt" (custom instructions) for $1.99 one-time on any paid tier.
         </p>
       </div>
 

@@ -6,7 +6,8 @@ export type UsageRecord = {
   freeUsed: number;           // total lifetime for free users
   paidDailyUsed: number;      // daily for paid users
   paidDate: string;           // YYYY-MM-DD
-  isPaid: boolean;            // true if user has active paid plan
+  isPaid: boolean;            // true if user has active paid plan (any pack or unlimited)
+  hasCustomPrompts: boolean;  // true if user paid the $1.99 add-on to unlock custom prompts
 };
 
 export const usageStore = new Map<string, UsageRecord>();
@@ -37,6 +38,7 @@ export function getUsage(userId: string) {
       paidDailyUsed: 0,
       paidDate: today,
       isPaid: false,
+      hasCustomPrompts: false,
     };
     usageStore.set(userId, record);
   }
@@ -52,6 +54,7 @@ export function getUsage(userId: string) {
       remaining,
       limit: PAID_DAILY_LIMIT,
       isPaid: true,
+      hasCustomPrompts: !!record.hasCustomPrompts,
     };
   } else {
     const remaining = Math.max(0, FREE_LIMIT - record.freeUsed);
@@ -60,6 +63,7 @@ export function getUsage(userId: string) {
       remaining,
       limit: FREE_LIMIT,
       isPaid: false,
+      hasCustomPrompts: !!record.hasCustomPrompts,
     };
   }
 }
@@ -71,6 +75,7 @@ export function consumeOneRoast(userId: string): {
   remaining?: number;
   limit?: number;
   isPaid?: boolean;
+  hasCustomPrompts?: boolean;
 } {
   const today = getToday();
   let record = usageStore.get(userId);
@@ -80,6 +85,7 @@ export function consumeOneRoast(userId: string): {
       paidDailyUsed: 0,
       paidDate: today,
       isPaid: false,
+      hasCustomPrompts: false,
     };
     usageStore.set(userId, record);
   }
@@ -98,6 +104,7 @@ export function consumeOneRoast(userId: string): {
         remaining: 0,
         limit: PAID_DAILY_LIMIT,
         isPaid: true,
+        hasCustomPrompts: !!record.hasCustomPrompts,
       };
     }
 
@@ -108,6 +115,7 @@ export function consumeOneRoast(userId: string): {
       remaining: Math.max(0, PAID_DAILY_LIMIT - record.paidDailyUsed),
       limit: PAID_DAILY_LIMIT,
       isPaid: true,
+      hasCustomPrompts: !!record.hasCustomPrompts,
     };
   } else {
     if (record.freeUsed >= FREE_LIMIT) {
@@ -118,6 +126,7 @@ export function consumeOneRoast(userId: string): {
         remaining: 0,
         limit: FREE_LIMIT,
         isPaid: false,
+        hasCustomPrompts: !!record.hasCustomPrompts,
       };
     }
 
@@ -128,6 +137,7 @@ export function consumeOneRoast(userId: string): {
       remaining: Math.max(0, FREE_LIMIT - record.freeUsed),
       limit: FREE_LIMIT,
       isPaid: false,
+      hasCustomPrompts: !!record.hasCustomPrompts,
     };
   }
 }
@@ -138,7 +148,20 @@ export function markUserAsPaid(userId: string) {
     paidDailyUsed: 0,
     paidDate: getToday(),
     isPaid: false,
+    hasCustomPrompts: false,
   };
   record.isPaid = true;
+  usageStore.set(userId, record);
+}
+
+export function markCustomPromptsUnlocked(userId: string) {
+  const record = usageStore.get(userId) || {
+    freeUsed: 0,
+    paidDailyUsed: 0,
+    paidDate: getToday(),
+    isPaid: false,
+    hasCustomPrompts: false,
+  };
+  record.hasCustomPrompts = true;
   usageStore.set(userId, record);
 }
