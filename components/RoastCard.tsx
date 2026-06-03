@@ -147,12 +147,11 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     ctx.shadowColor = 'transparent';
 
     // Branded CTA at the very bottom of the exported PNG (baked into every shareable card).
-    // Red Roasty icon (R badge) + "click here to roast back" call-to-action.
-    // The actual domain is shown smaller below so the link is still buried for promotion
-    // when the image is shared (and looks special thanks to the custom icon).
+    // Red Roasty icon (R badge) + strong call-to-action to drive more users.
+    // The domain is shown smaller below so the link is buried for promotion.
     const ctaY = CARD_HEIGHT - 58;
     const domainY = CARD_HEIGHT - 36;
-    const ctaText = 'click here to roast back';
+    const ctaText = 'roast your friends too';
     const domainText = SITE_URL.replace('https://', '');
 
     ctx.font = '400 22px system-ui, -apple-system, sans-serif';
@@ -220,7 +219,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
       // The roast itself is already visually in the image (the card).
       // This prevents the share sheet from creating a duplicate "regular text message"
       // that repeats the roast text.
-      const shareText = `I just got roasted by Grok 😂\n\n👉 Get roasted too: ${SITE_URL}`;
+      const shareText = `Just got roasted by Grok 😂 (brutal but funny)\n\nFree to try — roast your friends too: ${SITE_URL}`;
 
       // Prefer native share sheet on mobile (Save to Photos is easy)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {

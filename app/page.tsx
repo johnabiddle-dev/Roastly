@@ -287,7 +287,7 @@ export default function RoastlyLanding() {
 
             {/* Share / Referral link section - key for getting more users */}
       <div className="text-center mt-12 pb-12 border-t border-zinc-800 pt-8">
-        <p className="text-zinc-400 mb-2">Share with friends — you both win</p>
+        <p className="text-zinc-400 mb-2 font-medium">The best way to grow: share your personal link</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <a 
             href={`https://roastly-app.vercel.app/roast?ref=${typeof window !== 'undefined' ? (localStorage.getItem('roastly-browser-id') || getOrCreateBrowserId()) : ''}`}
@@ -302,14 +302,14 @@ export default function RoastlyLanding() {
               const id = getOrCreateBrowserId();
               const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
               navigator.clipboard.writeText(link);
-              alert("Personal referral link copied! Friends get extra free roasts, and you get bonus roasts when they pay.");
+              alert("Personal referral link copied! When friends roast and pay, you get +5 bonus roasts.");
             }}
-            className="bg-zinc-800 hover:bg-zinc-700 text-white text-sm px-4 py-2 rounded-2xl transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm px-4 py-2 rounded-2xl transition-colors font-semibold"
           >
             Copy your referral link
           </button>
         </div>
-        <p className="text-xs text-zinc-500 mt-2">Friends get 3+ free roasts. You get +5 bonus roasts when they buy a pack.</p>
+        <p className="text-xs text-zinc-500 mt-2">Friends get extra free roasts when they use your link.<br />You earn +5 bonus roasts when they buy anything.</p>
       </div>
 
       {/* Legal footer */}

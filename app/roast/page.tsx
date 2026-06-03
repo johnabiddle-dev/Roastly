@@ -249,6 +249,22 @@ export default function RoastPage() {
     handleGetRoasted();
   };
 
+  // For growth: personal referral link so users can bring friends (they get bonus free roasts, you get +5 when they pay)
+  const copyReferralLink = () => {
+    const id = getOrCreateBrowserId();
+    const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
+    navigator.clipboard.writeText(link);
+    alert("Your personal referral link copied!\n\nFriends who use it get extra free roasts.\nYou get +5 bonus roasts when they buy any pack.");
+  };
+
+  // Direct share to X for growth (pre-filled with good copy + your referral link)
+  const shareToX = () => {
+    const id = getOrCreateBrowserId();
+    const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
+    const text = encodeURIComponent(`I just got roasted by Grok 😂\n\nRoast your friends too (free to try): ${link}`);
+    window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+  };
+
   // Checkout handler (same pattern as landing page)
   const handleCheckout = async (priceId: string) => {
     if (!priceId) {
@@ -360,6 +376,37 @@ export default function RoastPage() {
               >
                 Upload Different Photo
               </button>
+            </div>
+
+            {/* Growth / Virality section: Get this into more people's hands */}
+            <div className="mt-6 p-4 bg-zinc-900 rounded-2xl border border-zinc-700 text-center">
+              <p className="text-emerald-400 text-sm font-medium mb-1">🔥 Help it spread</p>
+              <p className="text-zinc-400 text-sm mb-3">Share your roast cards — friends who use your link get extra free roasts, and you earn +5 bonus roasts when they pay.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={copyReferralLink}
+                  className="bg-emerald-600 hover:bg-emerald-500 px-6 py-2 rounded-2xl text-sm font-semibold transition-colors"
+                >
+                  Copy my referral link
+                </button>
+                <button
+                  onClick={shareToX}
+                  className="bg-sky-600 hover:bg-sky-500 px-6 py-2 rounded-2xl text-sm font-semibold transition-colors"
+                >
+                  Post on X
+                </button>
+                <button
+                  onClick={() => {
+                    if (roasts.length > 0) {
+                      setSelectedRoastForCard(roasts[0]);
+                      setShowCard(true);
+                    }
+                  }}
+                  className="bg-zinc-800 hover:bg-zinc-700 px-6 py-2 rounded-2xl text-sm font-semibold transition-colors"
+                >
+                  Make shareable card
+                </button>
+              </div>
             </div>
 
             {usage && usage.remaining <= 0 && (
