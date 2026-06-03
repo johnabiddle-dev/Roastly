@@ -350,7 +350,7 @@ export default function RoastPage() {
 
                 {usage && usage.debug && (
                   <div className="text-[8px] text-zinc-500 mt-1 break-all">
-                    debug: received={usage.debug.receivedBrowserId} env={usage.debug.ownerEnv} match={usage.debug.matchesOwner ? 'yes' : 'no'}
+                    debug: rec={usage.debug.receivedBrowserId} (len={usage.debug.receivedLength}) env={usage.debug.ownerEnv} (len={usage.debug.ownerLength}) match={usage.debug.matchesOwner ? 'yes' : 'no'} cleanMatch={usage.debug.cleanMatch ? 'yes' : 'no'}
                   </div>
                 )}
               </div>
@@ -514,7 +514,7 @@ export default function RoastPage() {
 
                 {usage && usage.debug && (
                   <div className="text-[8px] text-zinc-500 mt-1 break-all">
-                    debug: received={usage.debug.receivedBrowserId} env={usage.debug.ownerEnv} match={usage.debug.matchesOwner ? 'yes' : 'no'}
+                    debug: rec={usage.debug.receivedBrowserId} (len={usage.debug.receivedLength}) env={usage.debug.ownerEnv} (len={usage.debug.ownerLength}) match={usage.debug.matchesOwner ? 'yes' : 'no'} cleanMatch={usage.debug.cleanMatch ? 'yes' : 'no'}
                   </div>
                 )}
 

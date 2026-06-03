@@ -20,12 +20,18 @@ export async function GET(req: NextRequest) {
   const receivedBrowserId = req.headers.get("x-roastly-browser-id") || "no-id";
   const ownerEnv = process.env.OWNER_BROWSER_ID || '';
 
+  const cleanReceived = receivedBrowserId.trim();
+  const cleanOwner = ownerEnv.trim();
+
   return NextResponse.json({
     ...status,
     debug: {
       receivedBrowserId,
       ownerEnv,
-      matchesOwner: receivedBrowserId === ownerEnv && !!ownerEnv,
+      receivedLength: receivedBrowserId.length,
+      ownerLength: ownerEnv.length,
+      matchesOwner: cleanReceived === cleanOwner && !!cleanOwner,
+      cleanMatch: cleanReceived === cleanOwner,
     }
   });
 }

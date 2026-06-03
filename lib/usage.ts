@@ -24,7 +24,9 @@ export const PAID_DAILY_LIMIT = 10;
 const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || '';
 
 function isOwner(browserId: string): boolean {
-  return !!OWNER_BROWSER_ID && browserId === OWNER_BROWSER_ID;
+  const cleanBrowser = (browserId || '').trim();
+  const cleanOwner = (OWNER_BROWSER_ID || '').trim();
+  return !!cleanOwner && cleanBrowser === cleanOwner;
 }
 
 export function getUserId(req: NextRequest): string {
