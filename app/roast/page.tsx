@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import RoastCard from '@/components/RoastCard';
+import { STRIPE_PRICES } from '@/lib/stripe';
 
 export default function RoastPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -12,6 +13,9 @@ export default function RoastPage() {
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
+
   const getOrCreateBrowserId = () => {
     if (typeof window === "undefined") return "server";
     let id = localStorage.getItem("roastly-browser-id");
@@ -166,8 +170,8 @@ export default function RoastPage() {
       const clientUsed = getClientFreeUsed(browserId);
 
       // Client-side check for free limit (in case server forgot due to serverless)
-      if (!usage?.isPaid && clientUsed >= 3) {
-        setError("Free limit reached (3 total)");
+      if (usage && usage.remaining <= 0) {
+        setShowUpgradeModal(true);
         setIsGenerating(false);
         return;
       }
@@ -234,6 +238,52 @@ export default function RoastPage() {
   const handleRegenerate = () => {
     setRoasts([]);
     handleGetRoasted();
+  };
+
+  // Checkout handler (same pattern as landing page)
+  const handleCheckout = async (priceId: string) => {
+    if (!priceId) {
+      alert("This product isn't set up yet.");
+      return;
+    }
+
+    const isSubscription = priceId === STRIPE_PRICES.unlimited;
+    const productLabel = isSubscription ? "Unlimited Roasts ($19.99/mo)" : 
+      priceId === STRIPE_PRICES.starter ? "Starter ($0.99)" :
+      priceId === STRIPE_PRICES.popular ? "Popular Pack ($4.99)" :
+      priceId === STRIPE_PRICES.heavy ? "Heavy Roaster ($9.99)" : "selected pack";
+
+    const confirmMessage = `You are about to purchase the ${productLabel}.` + 
+      (isSubscription ? " This will be a recurring monthly charge." : " This is a one-time purchase.") +
+      " Do you want to continue?";
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsCheckingOut(priceId);
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId }),
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        setShowUpgradeModal(false);
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Something went wrong");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to start checkout. Please try again.");
+    } finally {
+      setIsCheckingOut(null);
+    }
   };
 
   return (
@@ -303,16 +353,20 @@ export default function RoastPage() {
               </button>
             </div>
 
-            {usage && !usage.isPaid && usage.remaining <= 0 && (
+            {usage && usage.remaining <= 0 && (
               <div className="text-center mt-4 p-4 bg-zinc-900 rounded-2xl border border-zinc-700">
-                <p className="text-sm text-zinc-400 mb-2">You've used your 3 free roasts total.</p>
-                <a 
-                  href="/" 
+                <p className="text-sm text-zinc-400 mb-2">
+                  {usage.isPaid 
+                    ? "You've used your 10 roasts for today." 
+                    : "You've used your 3 free roasts total."}
+                </p>
+                <button 
+                  onClick={() => setShowUpgradeModal(true)}
                   className="inline-block bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-2xl font-semibold text-sm transition-colors"
                 >
-                  Buy more roasts →
-                </a>
-                <p className="text-xs text-zinc-500 mt-2">See our paid plans on the main page</p>
+                  Unlock more roasts →
+                </button>
+                <p className="text-xs text-zinc-500 mt-2">Get 10 per day with any paid pack</p>
               </div>
             )}
           </div>
@@ -392,13 +446,13 @@ export default function RoastPage() {
                 )}
                 <button
                   onClick={handleGetRoasted}
-                  disabled={isGenerating || Boolean(usage && usage.remaining <= 0)}
+                  disabled={isGenerating}
                   className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 transition-colors text-white text-xl font-semibold px-12 py-4 rounded-2xl"
                 >
-                  {usage && usage.remaining <= 0 
-                    ? (usage.isPaid ? "Daily limit reached" : "Free limit reached")
-                    : isGenerating 
-                      ? "Generating roasts..." 
+                  {isGenerating 
+                    ? "Generating roasts..." 
+                    : usage && usage.remaining <= 0 
+                      ? (usage.isPaid ? "Daily limit reached — Upgrade" : "Free limit reached — Unlock more")
                       : "Get Roasted →"}
                 </button>
                 <p className="text-xs text-zinc-500 mt-3">
@@ -409,14 +463,14 @@ export default function RoastPage() {
                     : "Loading limit..."}
                 </p>
 
-                {usage && !usage.isPaid && usage.remaining <= 0 && (
+                {usage && usage.remaining <= 0 && (
                   <div className="mt-3">
-                    <a 
-                      href="/" 
+                    <button 
+                      onClick={() => setShowUpgradeModal(true)}
                       className="text-emerald-400 hover:text-emerald-300 text-sm underline"
                     >
-                      Buy more roasts on the main page →
-                    </a>
+                      See payment options to unlock more roasts →
+                    </button>
                   </div>
                 )}
               </div>
@@ -433,6 +487,104 @@ export default function RoastPage() {
           isUplifting={vibe === 'uplifting'}
           onClose={() => setShowCard(false)}
         />
+      )}
+
+      {/* Upgrade / Pay Modal - pushes payment options exactly when user hits the free (or daily) limit */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4">
+          <div className="bg-zinc-900 rounded-3xl max-w-lg w-full p-6 text-center">
+            <h2 className="text-2xl font-bold mb-2">
+              {usage?.isPaid ? "Daily limit reached" : "Free limit reached"}
+            </h2>
+            <p className="text-zinc-400 mb-6">
+              {usage?.isPaid 
+                ? "You've used all 10 roasts for today. Buy another pack or go Unlimited for ongoing access."
+                : "You've used your 3 free roasts (total). Any paid pack instantly unlocks 10 fresh roasts every single day."}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              {/* Starter */}
+              <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col">
+                <div className="text-2xl font-bold">$0.99</div>
+                <div className="text-sm text-zinc-400">Starter Pack</div>
+                <div className="text-xs mt-1 mb-3 text-zinc-500">Unlocks 10 roasts per day (one-time)</div>
+                <button
+                  onClick={() => handleCheckout(STRIPE_PRICES.starter)}
+                  disabled={isCheckingOut !== null}
+                  className="mt-auto bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {isCheckingOut === STRIPE_PRICES.starter ? "Processing..." : "Buy Starter"}
+                </button>
+              </div>
+
+              {/* Popular - featured */}
+              <div className="bg-zinc-950 border-2 border-red-600 rounded-2xl p-4 flex flex-col relative">
+                <div className="absolute -top-2 right-3 bg-red-600 text-[10px] px-2 py-0.5 rounded-full font-medium">MOST POPULAR</div>
+                <div className="text-2xl font-bold">$4.99</div>
+                <div className="text-sm text-zinc-400">Popular Pack</div>
+                <div className="text-xs mt-1 mb-3 text-zinc-500">Unlocks 10 roasts per day (one-time)</div>
+                <button
+                  onClick={() => handleCheckout(STRIPE_PRICES.popular)}
+                  disabled={isCheckingOut !== null}
+                  className="mt-auto bg-red-600 hover:bg-red-500 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {isCheckingOut === STRIPE_PRICES.popular ? "Processing..." : "Buy Popular Pack"}
+                </button>
+              </div>
+
+              {/* Heavy */}
+              <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col">
+                <div className="text-2xl font-bold">$9.99</div>
+                <div className="text-sm text-zinc-400">Heavy Roaster</div>
+                <div className="text-xs mt-1 mb-3 text-zinc-500">Unlocks 10 roasts per day (one-time)</div>
+                <button
+                  onClick={() => handleCheckout(STRIPE_PRICES.heavy)}
+                  disabled={isCheckingOut !== null}
+                  className="mt-auto bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {isCheckingOut === STRIPE_PRICES.heavy ? "Processing..." : "Buy Heavy Pack"}
+                </button>
+              </div>
+
+              {/* Unlimited */}
+              <div className="bg-zinc-950 border border-emerald-600 rounded-2xl p-4 flex flex-col">
+                <div className="text-2xl font-bold">$19.99<span className="text-sm font-normal text-zinc-400">/mo</span></div>
+                <div className="text-sm text-emerald-400">Unlimited Roasts</div>
+                <div className="text-xs mt-1 mb-3 text-zinc-500">10 roasts per day, recurring</div>
+                <button
+                  onClick={() => handleCheckout(STRIPE_PRICES.unlimited)}
+                  disabled={isCheckingOut !== null}
+                  className="mt-auto bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {isCheckingOut === STRIPE_PRICES.unlimited ? "Processing..." : "Get Unlimited"}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-zinc-500 mb-4">
+              One-time packs unlock the 10-roast daily cap on this browser/device. Unlimited Roasts is a recurring monthly subscription.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-2xl text-sm"
+              >
+                Maybe later
+              </button>
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 bg-zinc-700 hover:bg-zinc-600 py-2.5 rounded-2xl text-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="mt-4 text-[10px] text-emerald-400">
+              Paid users also unlock custom prompts — write your own instructions for the AI roast.
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
