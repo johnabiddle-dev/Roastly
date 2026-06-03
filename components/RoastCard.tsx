@@ -220,7 +220,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
       // The roast itself is already visually in the image (the card).
       // This prevents the share sheet from creating a duplicate "regular text message"
       // that repeats the roast text.
-      const shareText = `👉 Click here to roast back: ${SITE_URL}`;
+      const shareText = `I just got roasted by Grok 😂\n\n👉 Get roasted too: ${SITE_URL}`;
 
       // Prefer native share sheet on mobile (Save to Photos is easy)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {

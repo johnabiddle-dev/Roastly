@@ -35,6 +35,13 @@ export default function SuccessPage() {
           body: JSON.stringify({ sessionId }),
         });
 
+        // Also send referrer if present so we can credit them (growth via referrals)
+        const storedRef = localStorage.getItem('roastly-referrer');
+        if (storedRef) {
+          // We can fire and forget a small call, or include in future
+          // For now, the usage fetch on site visit already sets it.
+        }
+
         const data = await res.json();
 
         if (res.ok) {

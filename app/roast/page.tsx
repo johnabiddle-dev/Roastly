@@ -13,7 +13,7 @@ export default function RoastPage() {
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean } | null>(null);
+  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean; bonusRoasts?: number; referredBy?: string } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
 
@@ -98,10 +98,16 @@ export default function RoastPage() {
 
   const fetchUsage = async () => {
     try {
+      const headers: Record<string, string> = {
+        "x-roastly-browser-id": getOrCreateBrowserId(),
+      };
+      const storedReferrer = typeof window !== "undefined" ? localStorage.getItem("roastly-referrer") : null;
+      if (storedReferrer) {
+        headers["x-roastly-referrer"] = storedReferrer;
+      }
+
       const res = await fetch("/api/usage", {
-        headers: {
-          "x-roastly-browser-id": getOrCreateBrowserId(),
-        },
+        headers,
       });
       const data = await res.json();
       const browserId = getOrCreateBrowserId();
@@ -142,6 +148,19 @@ export default function RoastPage() {
         hasCustomPrompts: false,
       });
     }
+
+    // Capture referral if present in URL (for growth / getting more users)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const ref = url.searchParams.get("ref");
+      if (ref && ref !== browserId) {
+        localStorage.setItem("roastly-referrer", ref);
+        // clean the URL so it doesn't stay in history
+        url.searchParams.delete("ref");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+
     fetchUsage();
   }, []);
 

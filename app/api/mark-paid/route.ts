@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   try {
-    const { sessionId } = await request.json();
+    const { sessionId, referredBy: bodyReferrer } = await request.json();
 
     if (!sessionId) {
       return NextResponse.json({ error: "Session ID required" }, { status: 400 });
@@ -29,6 +29,13 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = makeUserId(ip, browserId);
+
+    // Set referrer if provided in the payment flow or from body (for growth)
+    const referrer = request.headers.get("x-roastly-referrer") || bodyReferrer;
+    if (referrer && referrer !== browserId) {
+      const { setReferredBy } = await import("@/lib/usage");
+      setReferredBy(userId, referrer);
+    }
 
     // Mark this browser/IP as paid (gives them 10/day instead of free 3 total)
     // All paid products (one-time packs + pro sub) unlock the daily cap for now.

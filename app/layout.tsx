@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roastly — Get Brutally Roasted by AI",
-  description: "Upload a photo. Get destroyed by Grok AI. Share the pain with your friends. Free to try (3 roasts), then buy packs that unlock 10 roasts per day.",
+  title: "Roastly — Get Brutally Roasted by Grok",
+  description: "Upload a photo. Get destroyed (or uplifted) by Grok AI. Share the results as beautiful cards. Free to try (3 roasts), then cheap packs that unlock 10 roasts/day + custom prompts.",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -23,8 +23,8 @@ export const metadata: Metadata = {
     apple: "/favicon.ico",
   },
   openGraph: {
-    title: "Roastly — Brutal AI Roasts",
-    description: "Upload a photo. Get destroyed by Grok. The most savage roasts on the internet. Free to try, then cheap packs.",
+    title: "Roastly — Brutal AI Roasts by Grok",
+    description: "Upload a photo. Get roasted by Grok. The most savage (and sometimes nicest) roasts on the internet. Free to try, then cheap packs.",
     images: [
       {
         url: "https://roastly-app.vercel.app/og.png",
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Roastly — Brutal AI Roasts",
-    description: "Upload a photo. Get destroyed by Grok. Share the pain.",
+    title: "Roastly — Brutal AI Roasts by Grok",
+    description: "Upload a photo. Get destroyed by Grok. Share the pain (or the love).",
   },
 };
 

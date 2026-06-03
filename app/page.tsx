@@ -1,22 +1,24 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { STRIPE_PRICES } from '@/lib/stripe';
 
 export default function RoastlyLanding() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
+  const getOrCreateBrowserId = () => {
+    if (typeof window === "undefined") return "server";
+    let id = localStorage.getItem("roastly-browser-id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("roastly-browser-id", id);
+    }
+    return id;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      console.log('Selected file:', file);
-      alert(`Photo selected: ${file.name}\n\n(We'll build the actual roasting flow next)`);
-    }
+  const handleUploadClick = () => {
+    // The real flow is at /roast. This button just scrolls or links for marketing.
+    window.location.href = '/roast';
   };
 
   const handleCheckout = async (priceId: string) => {
@@ -119,30 +121,22 @@ export default function RoastlyLanding() {
           </h1>
 
           <p className="text-2xl text-zinc-400 mb-10 max-w-xl mx-auto">
-            Upload a photo. Get destroyed by AI. <br />
-            Then share the results with your friends.
+            Upload a photo. Get destroyed by Grok.<br />
+            Or uplifted. Then share the card with your friends.
           </p>
 
           <a 
             href="/roast"
             className="inline-block bg-red-600 hover:bg-red-500 transition-all text-white text-xl font-semibold px-10 py-4 rounded-2xl active:scale-[0.985]"
           >
-            Upload photo & get roasted →
+            Upload photo & get roasted by Grok →
           </a>
 
           <p className="mt-4 text-sm text-zinc-500">
-            Free to try • No credit card required
+            Free to try (3 roasts) • No credit card required
           </p>
         </div>
 
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept="image/*"
-          className="hidden"
-        />
       </div>
 
       {/* Example Roasts - Text Only */}
@@ -291,29 +285,31 @@ export default function RoastlyLanding() {
         </p>
       </div>
 
-            {/* Share link section */}
+            {/* Share / Referral link section - key for getting more users */}
       <div className="text-center mt-12 pb-12 border-t border-zinc-800 pt-8">
-        <p className="text-zinc-400 mb-2">Want to let friends try it?</p>
+        <p className="text-zinc-400 mb-2">Share with friends — you both win</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <a 
-            href="https://roastly-app.vercel.app" 
-            className="text-red-400 hover:text-red-300 underline text-lg font-medium"
+            href={`https://roastly-app.vercel.app/roast?ref=${typeof window !== 'undefined' ? (localStorage.getItem('roastly-browser-id') || getOrCreateBrowserId()) : ''}`}
+            className="text-red-400 hover:text-red-300 underline text-lg font-medium break-all"
             target="_blank"
             rel="noopener noreferrer"
           >
-            https://roastly-app.vercel.app
+            Your personal link
           </a>
           <button
             onClick={() => {
-              navigator.clipboard.writeText("https://roastly-app.vercel.app");
-              alert("Link copied! Share it with your friends.");
+              const id = getOrCreateBrowserId();
+              const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
+              navigator.clipboard.writeText(link);
+              alert("Personal referral link copied! Friends get extra free roasts, and you get bonus roasts when they pay.");
             }}
             className="bg-zinc-800 hover:bg-zinc-700 text-white text-sm px-4 py-2 rounded-2xl transition-colors"
           >
-            Copy link
+            Copy your referral link
           </button>
         </div>
-        <p className="text-xs text-zinc-500 mt-2">Friends get 3 free roasts to start — no account needed.</p>
+        <p className="text-xs text-zinc-500 mt-2">Friends get 3+ free roasts. You get +5 bonus roasts when they buy a pack.</p>
       </div>
 
       {/* Legal footer */}
@@ -321,7 +317,7 @@ export default function RoastlyLanding() {
         <a href="/privacy" className="hover:text-zinc-400 mx-2">Privacy</a>
         <a href="/terms" className="hover:text-zinc-400 mx-2">Terms</a>
         <span className="mx-2">•</span>
-        <span>Payments by Stripe • Roasts by Grok</span>
+        <span>Payments by Stripe • Roasts by Grok (xAI)</span>
       </div>
     </div>
   );

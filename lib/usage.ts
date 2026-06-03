@@ -8,6 +8,8 @@ export type UsageRecord = {
   paidDate: string;           // YYYY-MM-DD
   isPaid: boolean;            // true if user has active paid plan (any pack or unlimited)
   hasCustomPrompts: boolean;  // true if user paid the $1.99 add-on to unlock custom prompts
+  referredBy?: string;        // browserId of the person who referred this user
+  bonusRoasts: number;        // extra roasts earned via referrals etc.
 };
 
 export const usageStore = new Map<string, UsageRecord>();
@@ -39,6 +41,7 @@ export function getUsage(userId: string) {
       paidDate: today,
       isPaid: false,
       hasCustomPrompts: false,
+      bonusRoasts: 0,
     };
     usageStore.set(userId, record);
   }
@@ -48,22 +51,30 @@ export function getUsage(userId: string) {
       record.paidDailyUsed = 0;
       record.paidDate = today;
     }
-    const remaining = Math.max(0, PAID_DAILY_LIMIT - record.paidDailyUsed);
+    const bonus = record.bonusRoasts || 0;
+    const effectiveLimit = PAID_DAILY_LIMIT + bonus;
+    const remaining = Math.max(0, effectiveLimit - record.paidDailyUsed);
     return {
       used: record.paidDailyUsed,
       remaining,
-      limit: PAID_DAILY_LIMIT,
+      limit: effectiveLimit,
       isPaid: true,
       hasCustomPrompts: !!record.hasCustomPrompts,
+      bonusRoasts: bonus,
+      referredBy: record.referredBy,
     };
   } else {
-    const remaining = Math.max(0, FREE_LIMIT - record.freeUsed);
+    const bonus = record.bonusRoasts || 0;
+    const effectiveLimit = FREE_LIMIT + bonus;
+    const remaining = Math.max(0, effectiveLimit - record.freeUsed);
     return {
       used: record.freeUsed,
       remaining,
-      limit: FREE_LIMIT,
+      limit: effectiveLimit,
       isPaid: false,
       hasCustomPrompts: !!record.hasCustomPrompts,
+      bonusRoasts: bonus,
+      referredBy: record.referredBy,
     };
   }
 }
@@ -76,6 +87,8 @@ export function consumeOneRoast(userId: string): {
   limit?: number;
   isPaid?: boolean;
   hasCustomPrompts?: boolean;
+  bonusRoasts?: number;
+  referredBy?: string;
 } {
   const today = getToday();
   let record = usageStore.get(userId);
@@ -86,6 +99,7 @@ export function consumeOneRoast(userId: string): {
       paidDate: today,
       isPaid: false,
       hasCustomPrompts: false,
+      bonusRoasts: 0,
     };
     usageStore.set(userId, record);
   }
@@ -96,46 +110,54 @@ export function consumeOneRoast(userId: string): {
       record.paidDate = today;
     }
 
-    if (record.paidDailyUsed >= PAID_DAILY_LIMIT) {
+    const bonus = record.bonusRoasts || 0;
+    const effectiveLimit = PAID_DAILY_LIMIT + bonus;
+    if (record.paidDailyUsed >= effectiveLimit) {
       return {
         allowed: false,
         error: "Daily limit reached",
         used: record.paidDailyUsed,
         remaining: 0,
-        limit: PAID_DAILY_LIMIT,
+        limit: effectiveLimit,
         isPaid: true,
         hasCustomPrompts: !!record.hasCustomPrompts,
       };
     }
 
     record.paidDailyUsed += 1;
+    const paidBonus = record.bonusRoasts || 0;
+    const paidEffectiveLimit = PAID_DAILY_LIMIT + paidBonus;
     return {
       allowed: true,
       used: record.paidDailyUsed,
-      remaining: Math.max(0, PAID_DAILY_LIMIT - record.paidDailyUsed),
-      limit: PAID_DAILY_LIMIT,
+      remaining: Math.max(0, paidEffectiveLimit - record.paidDailyUsed),
+      limit: paidEffectiveLimit,
       isPaid: true,
       hasCustomPrompts: !!record.hasCustomPrompts,
     };
   } else {
-    if (record.freeUsed >= FREE_LIMIT) {
+    const bonus = record.bonusRoasts || 0;
+    const effectiveLimit = FREE_LIMIT + bonus;
+    if (record.freeUsed >= effectiveLimit) {
       return {
         allowed: false,
         error: "Free limit reached (3 total)",
         used: record.freeUsed,
         remaining: 0,
-        limit: FREE_LIMIT,
+        limit: effectiveLimit,
         isPaid: false,
         hasCustomPrompts: !!record.hasCustomPrompts,
       };
     }
 
     record.freeUsed += 1;
+    const freeBonus = record.bonusRoasts || 0;
+    const freeEffectiveLimit = FREE_LIMIT + freeBonus;
     return {
       allowed: true,
       used: record.freeUsed,
-      remaining: Math.max(0, FREE_LIMIT - record.freeUsed),
-      limit: FREE_LIMIT,
+      remaining: Math.max(0, freeEffectiveLimit - record.freeUsed),
+      limit: freeEffectiveLimit,
       isPaid: false,
       hasCustomPrompts: !!record.hasCustomPrompts,
     };
@@ -149,9 +171,13 @@ export function markUserAsPaid(userId: string) {
     paidDate: getToday(),
     isPaid: false,
     hasCustomPrompts: false,
+    bonusRoasts: 0,
   };
   record.isPaid = true;
   usageStore.set(userId, record);
+
+  // If this payer was referred, give the referrer bonus roasts
+  creditReferrerOnPayment(userId, 5);
 }
 
 export function markCustomPromptsUnlocked(userId: string) {
@@ -161,7 +187,52 @@ export function markCustomPromptsUnlocked(userId: string) {
     paidDate: getToday(),
     isPaid: false,
     hasCustomPrompts: false,
+    bonusRoasts: 0,
   };
   record.hasCustomPrompts = true;
   usageStore.set(userId, record);
+
+  // Credit referrer if applicable
+  creditReferrerOnPayment(userId, 5);
+}
+
+export function grantBonusRoasts(userId: string, amount: number) {
+  let record = usageStore.get(userId);
+  if (!record) {
+    record = {
+      freeUsed: 0,
+      paidDailyUsed: 0,
+      paidDate: getToday(),
+      isPaid: false,
+      hasCustomPrompts: false,
+      bonusRoasts: 0,
+    };
+    usageStore.set(userId, record);
+  }
+  record.bonusRoasts = (record.bonusRoasts || 0) + Math.max(0, amount);
+}
+
+export function setReferredBy(userId: string, referrerId: string) {
+  let record = usageStore.get(userId);
+  if (!record) {
+    record = {
+      freeUsed: 0,
+      paidDailyUsed: 0,
+      paidDate: getToday(),
+      isPaid: false,
+      hasCustomPrompts: false,
+      bonusRoasts: 0,
+    };
+    usageStore.set(userId, record);
+  }
+  if (!record.referredBy) {
+    record.referredBy = referrerId;
+  }
+}
+
+function creditReferrerOnPayment(payerUserId: string, amount = 5) {
+  const payerRecord = usageStore.get(payerUserId);
+  if (payerRecord && payerRecord.referredBy) {
+    grantBonusRoasts(payerRecord.referredBy, amount);
+  }
 }

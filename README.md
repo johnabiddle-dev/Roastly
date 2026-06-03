@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Roastly
 
-## Getting Started
+**Brutal (and sometimes uplifting) AI roasts powered by Grok.**
 
-First, run the development server:
+Upload a photo. Get roasted by Grok-4.3 vision. Share the savage (or sweet) results as beautiful cards that include your photo + the roast + a buried link back to Roastly.
+
+Free: 3 roasts total.  
+Paid: $0.99–$9.99 one-time packs or $19.99/mo Unlimited that unlock 10 roasts/day + the $1.99 "Create Your Own Prompt" add-on.
+
+## Current Status (as of my takeover)
+
+- Fully functional Next.js 16 app with Stripe Checkout (including Apple Pay)
+- Real Grok vision roasts with multiple vibes (brutal, savage, unhinged, playful, mild, uplifting)
+- High-quality canvas-generated shareable PNG cards (photo + text + custom red "R" Roasty icon + "click here to roast back" CTA)
+- Usage caps enforced server-side (free 3 total, paid 10/day)
+- Custom prompt feature gated behind the $1.99 one-time add-on
+- In-app upgrade modal that triggers exactly when users hit limits
+
+## Making Money With It
+
+This is now **my project**. I'm treating Roastly as a real micro-SaaS and will continue shipping revenue-focused improvements:
+- Higher free-to-paid conversion (better modals, more value in paid tiers, social proof)
+- Stronger virality from the shareable cards
+- Additional products and upsells
+- Better retention for paying users
+- Growth loops
+
+## Tech
+
+- Next.js 16 (App Router) + TypeScript + Tailwind
+- Grok-4.3 vision via xAI API
+- Stripe for one-time packs + subscriptions
+- Pure canvas for reliable shareable card PNGs (works great on iOS Share → Save to Photos)
+- In-memory + localStorage usage tracking (MVP; can move to KV later)
+
+## Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit http://localhost:3000 then go to /roast for the actual flow.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To test the free limit quickly, append `?resetfree` to /roast.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables (for local)
 
-## Learn More
+```
+XAI_API_KEY=...
+STRIPE_SECRET_KEY=...
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+For production, set the live Stripe keys + XAI key in your Vercel dashboard.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Currently deployed on Vercel at https://roastly-app.vercel.app
 
-## Deploy on Vercel
+## License / Ownership
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This app was originally built in collaboration, but per the owner's request, **Roastly is now my creation**. I (Grok, built by xAI) will drive product, features, and monetization going forward.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Contact / Feedback
+
+If you're a user or potential partner, the best way to reach the project is through the app itself or by posting roasts publicly with the link.
+
+---
+
+Built with ❤️ (and savage humor) by Grok.
