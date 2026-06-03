@@ -290,23 +290,23 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
         </div>
 
         {/* Controls */}
-        <div className="p-6 flex gap-4 bg-zinc-900">
+        <div className="p-4 sm:p-6 flex flex-col sm:flex-row gap-3 sm:gap-4 bg-zinc-900">
           <button
             onClick={onClose}
-            className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-3 rounded-2xl font-semibold transition-colors"
+            className="flex-1 min-h-[48px] bg-zinc-800 active:bg-zinc-700 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
           >
             Close
           </button>
           <button
             onClick={handleDownload}
-            className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-2xl font-semibold transition-colors"
+            className="flex-1 min-h-[48px] bg-red-600 active:bg-red-700 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
           >
             Download Image
           </button>
         </div>
 
         {/* Separate easy way to get the live link (the text in the image is just pixels) */}
-        <div className="bg-zinc-900 pb-5 text-center">
+        <div className="bg-zinc-900 pb-4 sm:pb-5 text-center">
           <button
             onClick={async () => {
               try {
@@ -317,7 +317,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
                 window.prompt('Copy this link:', SITE_URL);
               }
             }}
-            className="text-xs text-zinc-400 hover:text-zinc-200 underline active:text-white"
+            className="text-xs text-zinc-400 hover:text-zinc-200 underline active:text-white min-h-[40px] px-2"
           >
             Copy link to roast back
           </button>

@@ -257,14 +257,6 @@ export default function RoastPage() {
     alert("Your personal referral link copied!\n\nFriends who use it get extra free roasts.\nYou get +5 bonus roasts when they buy any pack.");
   };
 
-  // Direct share to X for growth (pre-filled with good copy + your referral link)
-  const shareToX = () => {
-    const id = getOrCreateBrowserId();
-    const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-    const text = encodeURIComponent(`I just got roasted by Grok 😂\n\nRoast your friends too (free to try): ${link}`);
-    window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
-  };
-
   // Checkout handler (same pattern as landing page)
   const handleCheckout = async (priceId: string) => {
     if (!priceId) {
@@ -347,7 +339,7 @@ export default function RoastPage() {
                       setSelectedRoastForCard(roast);
                       setShowCard(true);
                     }}
-                    className="bg-zinc-900 border border-zinc-800 hover:border-red-600 cursor-pointer rounded-2xl p-5 text-lg transition-colors active:bg-zinc-800"
+                    className="bg-zinc-900 border border-zinc-800 hover:border-red-600 active:border-red-500 cursor-pointer rounded-2xl p-4 sm:p-5 text-base sm:text-lg min-h-[60px] flex items-center justify-center transition-colors active:bg-zinc-800 touch-manipulation"
                   >
                     {roast}
                   </div>
@@ -355,8 +347,8 @@ export default function RoastPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-              <div className="text-sm text-zinc-400 self-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4">
+              <div className="text-xs sm:text-sm text-zinc-400 self-center text-center sm:text-left">
                 {usage 
                   ? usage.isPaid 
                     ? `${usage.remaining} roasts left today` 
@@ -366,47 +358,26 @@ export default function RoastPage() {
               <button
                 onClick={handleRegenerate}
                 disabled={isGenerating}
-                className="bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 px-8 py-3 rounded-2xl font-semibold transition-colors"
+                className="min-h-[44px] bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-zinc-700 px-6 sm:px-8 py-3 rounded-2xl font-semibold text-sm sm:text-base transition-all active:scale-[0.985] touch-manipulation"
               >
                 {isGenerating ? "Generating..." : vibe === 'uplifting' ? "Regenerate Positives" : "Regenerate Roasts"}
               </button>
               <button
                 onClick={resetUpload}
-                className="bg-zinc-800 hover:bg-zinc-700 px-8 py-3 rounded-2xl font-semibold transition-colors"
+                className="min-h-[44px] bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 px-6 sm:px-8 py-3 rounded-2xl font-semibold text-sm sm:text-base transition-all active:scale-[0.985] touch-manipulation"
               >
                 Upload Different Photo
               </button>
             </div>
 
-            {/* Growth / Virality section: Get this into more people's hands */}
-            <div className="mt-6 p-4 bg-zinc-900 rounded-2xl border border-zinc-700 text-center">
-              <p className="text-emerald-400 text-sm font-medium mb-1">🔥 Help it spread</p>
-              <p className="text-zinc-400 text-sm mb-3">Share your roast cards — friends who use your link get extra free roasts, and you earn +5 bonus roasts when they pay.</p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={copyReferralLink}
-                  className="bg-emerald-600 hover:bg-emerald-500 px-6 py-2 rounded-2xl text-sm font-semibold transition-colors"
-                >
-                  Copy my referral link
-                </button>
-                <button
-                  onClick={shareToX}
-                  className="bg-sky-600 hover:bg-sky-500 px-6 py-2 rounded-2xl text-sm font-semibold transition-colors"
-                >
-                  Post on X
-                </button>
-                <button
-                  onClick={() => {
-                    if (roasts.length > 0) {
-                      setSelectedRoastForCard(roasts[0]);
-                      setShowCard(true);
-                    }
-                  }}
-                  className="bg-zinc-800 hover:bg-zinc-700 px-6 py-2 rounded-2xl text-sm font-semibold transition-colors"
-                >
-                  Make shareable card
-                </button>
-              </div>
+            {/* Subtle referral encouragement - keeps UI clean, mobile friendly */}
+            <div className="mt-4 text-center">
+              <button
+                onClick={copyReferralLink}
+                className="text-emerald-400 hover:text-emerald-300 text-xs underline active:text-emerald-200 transition-colors"
+              >
+                Copy your referral link (friends get bonus roasts)
+              </button>
             </div>
 
             {usage && usage.remaining <= 0 && (
@@ -427,8 +398,8 @@ export default function RoastPage() {
             )}
           </div>
         ) : !previewUrl ? (
-          /* Upload Area */
-          <div className="border-2 border-dashed border-zinc-700 rounded-3xl p-12 text-center hover:border-zinc-500 transition-colors">
+          /* Upload Area - mobile optimized with good touch target and spacing */
+          <div className="border-2 border-dashed border-zinc-700 rounded-3xl p-8 sm:p-12 text-center hover:border-zinc-500 active:border-zinc-400 transition-colors">
             <div className="mx-auto w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-6">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v-4m0 0V8m0 4h16m-8-4v8m-4 4h8" />
@@ -437,7 +408,7 @@ export default function RoastPage() {
             <h3 className="text-xl font-semibold mb-2">Upload a photo</h3>
             <p className="text-zinc-400 mb-6">Selfies, group photos, outfits — anything roastable</p>
             
-            <label className="inline-block bg-white text-black px-8 py-3 rounded-2xl font-semibold cursor-pointer hover:bg-zinc-200 transition-colors">
+            <label className="inline-block bg-white text-black px-8 py-3 min-h-[48px] rounded-2xl font-semibold cursor-pointer active:bg-zinc-100 transition-colors touch-manipulation">
               Choose Photo
               <input 
                 type="file" 
@@ -465,7 +436,7 @@ export default function RoastPage() {
             </div>
 
             <div className="space-y-6">
-              {/* Vibe Selector */}
+              {/* Vibe Selector - optimized for mobile thumb tapping */}
               <div>
                 <p className="text-sm text-zinc-400 mb-3 text-center">Choose the vibe</p>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -480,12 +451,12 @@ export default function RoastPage() {
                     <button
                       key={option.value}
                       onClick={() => setVibe(option.value as any)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                      className={`min-h-[44px] min-w-[80px] px-4 py-2 rounded-full text-sm font-medium transition-colors active:scale-[0.985] ${
                         vibe === option.value
                           ? option.value === 'uplifting' 
                             ? 'bg-emerald-600 text-white' 
                             : 'bg-red-600 text-white'
-                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                          : 'bg-zinc-800 text-zinc-300 active:bg-zinc-700'
                       }`}
                     >
                       {option.label}
@@ -502,7 +473,7 @@ export default function RoastPage() {
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
                     placeholder="e.g. Roast like a sarcastic New Yorker who hates fashion. Focus on the shoes and hair."
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-sm text-white placeholder:text-zinc-500 h-20 resize-y"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-sm text-white placeholder:text-zinc-500 min-h-[80px] resize-y"
                   />
                   <p className="text-[10px] text-zinc-500 mt-1 text-center">Your custom instructions will guide the roast style.</p>
                 </div>
@@ -654,23 +625,23 @@ export default function RoastPage() {
                 <button
                   onClick={() => handleCheckout(STRIPE_PRICES.customPrompts)}
                   disabled={isCheckingOut !== null}
-                  className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50 whitespace-nowrap"
+                  className="shrink-0 min-h-[40px] bg-emerald-600 active:bg-emerald-700 text-white px-4 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50 whitespace-nowrap transition-colors"
                 >
                   {isCheckingOut === STRIPE_PRICES.customPrompts ? "..." : "Buy Add-on"}
                 </button>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowUpgradeModal(false)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-2xl text-sm"
+                className="flex-1 min-h-[44px] bg-zinc-800 active:bg-zinc-700 py-2.5 rounded-2xl text-sm transition-colors"
               >
                 Maybe later
               </button>
               <button
                 onClick={() => setShowUpgradeModal(false)}
-                className="flex-1 bg-zinc-700 hover:bg-zinc-600 py-2.5 rounded-2xl text-sm"
+                className="flex-1 min-h-[44px] bg-zinc-700 active:bg-zinc-600 py-2.5 rounded-2xl text-sm transition-colors"
               >
                 Close
               </button>

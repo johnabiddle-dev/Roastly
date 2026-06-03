@@ -127,7 +127,7 @@ export default function RoastlyLanding() {
 
           <a 
             href="/roast"
-            className="inline-block bg-red-600 hover:bg-red-500 transition-all text-white text-xl font-semibold px-10 py-4 rounded-2xl active:scale-[0.985]"
+            className="inline-block min-h-[52px] bg-red-600 active:bg-red-700 transition-all text-white text-lg sm:text-xl font-semibold px-8 sm:px-10 py-3 sm:py-4 rounded-2xl active:scale-[0.985] touch-manipulation"
           >
             Upload photo & get roasted by Grok →
           </a>
