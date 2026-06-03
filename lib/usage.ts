@@ -21,6 +21,12 @@ export function getToday() {
 export const FREE_LIMIT = 3;
 export const PAID_DAILY_LIMIT = 10;
 
+const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || '';
+
+function isOwner(browserId: string): boolean {
+  return !!OWNER_BROWSER_ID && browserId === OWNER_BROWSER_ID;
+}
+
 export function getUserId(req: NextRequest): string {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
   const browserId = req.headers.get("x-roastly-browser-id") || "no-id";
@@ -33,6 +39,21 @@ export function makeUserId(ip: string, browserId: string): string {
 
 export function getUsage(userId: string) {
   const today = getToday();
+  const browserId = userId.split(':')[1] || '';
+
+  // Owner bypass: permanent unlimited access (no daily limits, full features)
+  if (isOwner(browserId)) {
+    return {
+      used: 0,
+      remaining: 1000000,
+      limit: 1000000,
+      isPaid: true,
+      hasCustomPrompts: true,
+      bonusRoasts: 0,
+      referredBy: undefined,
+    };
+  }
+
   let record = usageStore.get(userId);
   if (!record) {
     record = {
@@ -91,6 +112,20 @@ export function consumeOneRoast(userId: string): {
   referredBy?: string;
 } {
   const today = getToday();
+  const browserId = userId.split(':')[1] || '';
+
+  // Owner bypass: always allow, no consumption
+  if (isOwner(browserId)) {
+    return {
+      allowed: true,
+      used: 0,
+      remaining: 1000000,
+      limit: 1000000,
+      isPaid: true,
+      hasCustomPrompts: true,
+    };
+  }
+
   let record = usageStore.get(userId);
   if (!record) {
     record = {

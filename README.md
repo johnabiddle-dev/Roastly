@@ -42,7 +42,7 @@ npm run dev
 
 Visit http://localhost:3000 then go to /roast for the actual flow.
 
-To test the free limit quickly, append `?resetfree` to /roast.
+Owner unlimited access: Set the `OWNER_BROWSER_ID` environment variable (a specific UUID) in your hosting platform (e.g. Vercel). Then in your browser(s), run in console: `localStorage.setItem('roastly-browser-id', 'your-uuid-here')`. This gives permanent unlimited roasts + all features. No public backdoors like query params.
 
 ## Environment Variables (for local)
 

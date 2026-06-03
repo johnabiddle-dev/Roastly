@@ -29,21 +29,7 @@ export default function RoastPage() {
 
   const [error, setError] = useState('');
 
-  // For owner testing: append ?resetfree to the /roast URL to reset your free count
-  // (removes browser ID too for a completely fresh 3 free attempts, ignoring any server memory)
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("resetfree")) {
-      localStorage.removeItem("roastly-browser-id");
-      // also clean any old free-used keys (in case old browserId)
-      // we can't easily enumerate, but removing browserId will cause new one on next get
-      // clean the URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete("resetfree");
-      window.history.replaceState({}, "", url.toString());
-      // reload so fresh start with 3 free
-      window.location.reload();
-    }
-  }, []);
+  // No public reset mechanisms for security. Owner uses OWNER_BROWSER_ID env var for unlimited access.
 
   // Client-side persistence for free tier limit (so it survives serverless resets)
   const getClientFreeUsed = (browserId: string): number => {
