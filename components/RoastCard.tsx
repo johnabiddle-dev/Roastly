@@ -144,36 +144,45 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
 
-    // Buried site link at the very bottom of the exported PNG.
-    // Custom Roasty icon (red circle + white R) next to the URL
-    // so the link looks branded/special instead of generic when the image is shared.
-    // This baked-in icon + text travels with the PNG everywhere.
-    const linkY = CARD_HEIGHT - 45;
-    const linkText = 'roasty-app.vercel.app';
+    // Branded CTA at the very bottom of the exported PNG (baked into every shareable card).
+    // Red Roasty icon (R badge) + "click here to roast back" call-to-action.
+    // The actual domain is shown smaller below so the link is still buried for promotion
+    // when the image is shared (and looks special thanks to the custom icon).
+    const ctaY = CARD_HEIGHT - 58;
+    const domainY = CARD_HEIGHT - 36;
+    const ctaText = 'click here to roast back';
+    const domainText = 'roastly-app.vercel.app';
+
     ctx.font = '400 22px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#4b5563';
-    const textW = ctx.measureText(linkText).width;
+    const textW = ctx.measureText(ctaText).width;
     const cx = CARD_WIDTH / 2;
     const iconR = 8;
     const iconX = cx - textW / 2 - iconR - 8;
 
-    // Red Roasty badge icon
+    // Red Roasty badge icon (next to CTA)
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.arc(iconX, linkY - 1, iconR, 0, Math.PI * 2);
+    ctx.arc(iconX, ctaY - 1, iconR, 0, Math.PI * 2);
     ctx.fill();
 
     // White R inside icon
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('R', iconX, linkY + 3);
+    ctx.fillText('R', iconX, ctaY + 3);
 
-    // URL text
+    // CTA text
     ctx.font = '400 22px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#4b5563';
     ctx.textAlign = 'center';
-    ctx.fillText(linkText, cx, linkY);
+    ctx.fillText(ctaText, cx, ctaY);
+
+    // Domain (smaller, for discoverability when shared)
+    ctx.font = '400 16px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#4b5563';
+    ctx.textAlign = 'center';
+    ctx.fillText(domainText, cx, domainY);
 
     return canvas.toDataURL('image/png', 0.95);
   };
@@ -249,7 +258,8 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           <div className="mt-auto pt-8 text-center">
             <p className="text-xs text-zinc-500 tracking-[3px]">{isUplifting ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
             <p className={`${isUplifting ? "text-emerald-500" : "text-red-500"} font-bold text-lg -mt-1`}>SAUCY GROK</p>
-            <p className="text-[10px] text-zinc-600 mt-1 tracking-normal">roastly-app.vercel.app</p>
+            <p className="text-[10px] text-zinc-500 mt-1 tracking-normal">click here to roast back</p>
+            <p className="text-[9px] text-zinc-600 tracking-normal">roastly-app.vercel.app</p>
           </div>
         </div>
 
