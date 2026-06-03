@@ -98,6 +98,10 @@ export default function RoastPage() {
       const data = await res.json();
       const browserId = getOrCreateBrowserId();
 
+      if (data && data.debug) {
+        console.log('OWNER DEBUG from /api/usage:', data.debug);
+      }
+
       if (data && !data.isPaid) {
         const clientUsed = getClientFreeUsed(browserId);
         if (clientUsed > (data.used || 0)) {
