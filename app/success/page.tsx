@@ -1,4 +1,5 @@
 'use client';
+import { track } from "@vercel/analytics";
 
 import { useEffect, useState } from 'react';
 
@@ -39,6 +40,7 @@ export default function SuccessPage() {
 
         if (res.ok) {
           setStatus('success');
+          track('purchase_completed', { label: data.purchaseLabel || 'unknown' });
           const label = data.purchaseLabel || 'your purchase';
           const subNote = data.isSubscription
             ? ' This is a recurring monthly subscription.'

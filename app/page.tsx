@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { track } from "@vercel/analytics";
 import { STRIPE_PRICES } from '@/lib/stripe';
 
 export default function RoastlyLanding() {
@@ -40,6 +41,7 @@ export default function RoastlyLanding() {
     }
 
     setIsLoading(priceId);
+    track('checkout_started', { pack: priceId === STRIPE_PRICES.unlimited ? 'unlimited' : priceId });
 
     try {
       const res = await fetch("/api/checkout", {
@@ -289,7 +291,7 @@ export default function RoastlyLanding() {
         </p>
       </div>
 
-      {/* Share link section */}
+            {/* Share link section */}
       <div className="text-center mt-12 pb-12 border-t border-zinc-800 pt-8">
         <p className="text-zinc-400 mb-2">Want to let friends try it?</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -303,8 +305,8 @@ export default function RoastlyLanding() {
           </a>
           <button
             onClick={() => {
-              navigator.clipboard.writeText('https://roastly-app.vercel.app');
-              alert('Link copied! Share it with your friends.');
+              navigator.clipboard.writeText("https://roastly-app.vercel.app");
+              alert("Link copied! Share it with your friends.");
             }}
             className="bg-zinc-800 hover:bg-zinc-700 text-white text-sm px-4 py-2 rounded-2xl transition-colors"
           >
@@ -312,6 +314,14 @@ export default function RoastlyLanding() {
           </button>
         </div>
         <p className="text-xs text-zinc-500 mt-2">Friends get 3 free roasts to start — no account needed.</p>
+      </div>
+
+      {/* Legal footer */}
+      <div className="text-center pb-8 text-xs text-zinc-500 border-t border-zinc-800 pt-6">
+        <a href="/privacy" className="hover:text-zinc-400 mx-2">Privacy</a>
+        <a href="/terms" className="hover:text-zinc-400 mx-2">Terms</a>
+        <span className="mx-2">•</span>
+        <span>Payments by Stripe • Roasts by Grok</span>
       </div>
     </div>
   );
