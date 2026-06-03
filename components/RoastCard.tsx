@@ -216,7 +216,11 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
       }
       const file = new File([u8arr], 'roasted.png', { type: mime });
 
-      const shareText = `${roastText}\n\n👉 Click here to roast back: ${SITE_URL}`;
+      // Only send a short CTA + link in the share text.
+      // The roast itself is already visually in the image (the card).
+      // This prevents the share sheet from creating a duplicate "regular text message"
+      // that repeats the roast text.
+      const shareText = `👉 Click here to roast back: ${SITE_URL}`;
 
       // Prefer native share sheet on mobile (Save to Photos is easy)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
