@@ -29,7 +29,7 @@ function checkRateLimit(key: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageBase64, vibe = "brutal" } = await request.json();
+    const { imageBase64, vibe = "brutal", customPrompt } = await request.json();
 
     if (!imageBase64) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
@@ -57,6 +57,14 @@ export async function POST(request: NextRequest) {
           isPaid: preStatus.isPaid,
         },
         { status: 429 }
+      );
+    }
+
+    // Gate custom prompts to paid users only (enforced server-side)
+    if (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() && !preStatus.isPaid) {
+      return NextResponse.json(
+        { error: "Custom prompts are available for paid users only. Please upgrade." },
+        { status: 402 }
       );
     }
 
@@ -132,7 +140,12 @@ Rules:
       }
     };
 
-    const systemPrompt = getSystemPrompt(vibe);
+    let systemPrompt = getSystemPrompt(vibe);
+
+    // If user provided a custom prompt (paid-only feature), incorporate it
+    if (customPrompt && typeof customPrompt === 'string' && customPrompt.trim()) {
+      systemPrompt += `\n\nAdditional custom instructions from the user (follow these closely while staying in character):\n${customPrompt.trim()}`;
+    }
 
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
@@ -152,9 +165,12 @@ Rules:
             content: [
               {
                 type: "text",
-                text: vibe === 'uplifting' 
+                text: (vibe === 'uplifting' 
                   ? `Give this person super positive, uplifting feedback based on their photo. Celebrate what makes them wonderful. Here is the image:`
-                  : `Roast this person/photo in your signature saucy style. Here is the image:`,
+                  : `Roast this person/photo in your signature saucy style. Here is the image:`) +
+                  (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() 
+                    ? `\n\nFollow these custom instructions: ${customPrompt.trim()}` 
+                    : ''),
               },
               {
                 type: "image_url",

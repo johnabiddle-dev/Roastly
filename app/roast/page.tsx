@@ -12,6 +12,7 @@ export default function RoastPage() {
   const [showCard, setShowCard] = useState(false);
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
   const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
+  const [customPrompt, setCustomPrompt] = useState('');
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
@@ -188,6 +189,7 @@ export default function RoastPage() {
         body: JSON.stringify({
           imageBase64: base64,
           vibe: vibe,
+          customPrompt: customPrompt.trim() || undefined,
         }),
       });
 
@@ -233,6 +235,7 @@ export default function RoastPage() {
     setRoasts([]);
     setUsage(null);
     setError("");
+    setCustomPrompt("");
   };
 
   const handleRegenerate = () => {
@@ -437,6 +440,29 @@ export default function RoastPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Custom prompt - paid only perk. Free users see a teaser that opens the upgrade modal. */}
+              {usage?.isPaid ? (
+                <div>
+                  <p className="text-sm text-emerald-400 mb-1 text-center">Custom instructions (paid perk)</p>
+                  <textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    placeholder="e.g. Roast like a sarcastic New Yorker who hates fashion. Focus on the shoes and hair."
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-sm text-white placeholder:text-zinc-500 h-20 resize-y"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1 text-center">Your custom instructions will guide the roast style.</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                  >
+                    Unlock custom prompts (write your own instructions) →
+                  </button>
+                </div>
+              )}
 
               <div className="text-center">
                 {error && (
