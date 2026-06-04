@@ -180,8 +180,9 @@ Every roast should strive to become a viral post.`;
             ],
           },
         ],
-        temperature: 0.9,
-        max_tokens: 800,
+        temperature: 0.95,
+        top_p: 0.95,
+        max_tokens: 500,
       }),
     });
 
