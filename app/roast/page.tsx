@@ -11,7 +11,7 @@ export default function RoastPage() {
   const [roasts, setRoasts] = useState<string[]>([]);
   const [showCard, setShowCard] = useState(false);
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
-  const [vibe, setVibe] = useState<'brutal' | 'unhinged' | 'savage' | 'playful' | 'mild' | 'uplifting'>('brutal');
+  const [vibe, setVibe] = useState<'crispy' | 'medium_rare' | 'light_toast' | 'uplifting'>('crispy');
   const [customPrompt, setCustomPrompt] = useState('');
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean; bonusRoasts?: number; referredBy?: string } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -315,7 +315,13 @@ export default function RoastPage() {
 
             <div>
               <h2 className="text-2xl font-semibold mb-4 text-center">
-                {vibe === 'uplifting' ? 'Saucy Grok says something nice...' : 'Saucy Grok says...'}
+                {vibe === 'uplifting' 
+                  ? 'Saucy Grok says something nice...' 
+                  : vibe === 'crispy' 
+                    ? 'Crispy roast incoming...' 
+                    : vibe === 'medium_rare' 
+                      ? 'Medium Rare roast...' 
+                      : 'Light Toast roast...'}
               </h2>
               <div className="space-y-4">
                 <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast below to create a shareable card with it (includes your photo)</p>
@@ -349,7 +355,7 @@ export default function RoastPage() {
                 disabled={isGenerating}
                 className="min-h-[44px] bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-zinc-700 px-6 sm:px-8 py-3 rounded-2xl font-semibold text-sm sm:text-base transition-all active:scale-[0.985] touch-manipulation"
               >
-                {isGenerating ? "Generating..." : vibe === 'uplifting' ? "Regenerate Positives" : "Regenerate Roasts"}
+                {isGenerating ? "Generating..." : vibe === 'uplifting' ? "Regenerate Positives" : "Regenerate Roast"}
               </button>
               <button
                 onClick={resetUpload}
@@ -430,11 +436,9 @@ export default function RoastPage() {
                 <p className="text-sm text-zinc-400 mb-3 text-center">Choose the vibe</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {[
-                    { value: 'brutal', label: 'Brutal' },
-                    { value: 'unhinged', label: 'Unhinged' },
-                    { value: 'savage', label: 'Savage' },
-                    { value: 'playful', label: 'Playful' },
-                    { value: 'mild', label: 'Mild' },
+                    { value: 'crispy', label: 'Crispy' },
+                    { value: 'medium_rare', label: 'Medium Rare' },
+                    { value: 'light_toast', label: 'Light Toast' },
                     { value: 'uplifting', label: 'Uplifting' },
                   ].map((option) => (
                     <button
