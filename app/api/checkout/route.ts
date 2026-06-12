@@ -15,6 +15,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Whitelist to prevent client from sending arbitrary price IDs from the Stripe account
+    const validPriceIds = Object.values(STRIPE_PRICES);
+    if (!validPriceIds.includes(priceId)) {
+      return NextResponse.json(
+        { error: "Invalid price ID" },
+        { status: 400 }
+      );
+    }
+
     // Server is authoritative on mode. Only the exact unlimited price ID creates a recurring subscription.
     // This prevents any client-side bug or tampering from charging the wrong product (e.g. $0.99 button creating a pro subscription).
     const mode: "payment" | "subscription" =

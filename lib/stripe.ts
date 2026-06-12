@@ -25,4 +25,13 @@ export const STRIPE_PRICES = {
   // This unlocks the custom prompt textarea (write your own instructions for the AI).
   // Works on top of any paid tier (Starter/Popular/Heavy/Unlimited).
   customPrompts: "price_1TeFlxC5AToDgG5NrrGP1pcE",
+
+  // Special milestone deals (one-time $0.99 packs with bonus roasts for early commitment)
+  // Triggered as pop-ups:
+  // - firstRoastSpecial: shown after user's very first roast/card (12 roasts)
+  // - threeRoastSpecial: shown after user generates 3 roasts / hits free limit (10 roasts)
+  // These are bonus offers and do not replace the regular Starter $0.99 pack.
+  firstRoastSpecial: "price_1ThTgsC5AToDgG5NGfiJpgU3", // $0.99 → 12 roasts
+  threeRoastSpecial: "price_1ThTiNC5AToDgG5NBu5674b0", // $0.99 → 10 roasts
+
 };

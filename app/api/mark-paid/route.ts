@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { markUserAsPaid, markCustomPromptsUnlocked, makeUserId } from "@/lib/usage";
+import { markUserAsPaid, markCustomPromptsUnlocked, makeUserId, grantBonusRoasts } from "@/lib/usage";
 import { STRIPE_PRICES } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
@@ -44,6 +44,14 @@ export async function POST(request: NextRequest) {
     if (purchasedPriceId === STRIPE_PRICES.customPrompts) {
       // This is the add-on only
       markCustomPromptsUnlocked(userId);
+    } else if (purchasedPriceId === STRIPE_PRICES.firstRoastSpecial) {
+      // Special early commitment deal after first roast: grant 12 bonus roasts
+      markUserAsPaid(userId);
+      grantBonusRoasts(userId, 12);
+    } else if (purchasedPriceId === STRIPE_PRICES.threeRoastSpecial) {
+      // Special commitment deal after 3 roasts: grant 10 bonus roasts
+      markUserAsPaid(userId);
+      grantBonusRoasts(userId, 10);
     } else {
       // Main paid tiers unlock the daily cap
       markUserAsPaid(userId);
@@ -67,6 +75,10 @@ export async function POST(request: NextRequest) {
     } else if (purchasedPriceId === STRIPE_PRICES.customPrompts) {
       purchaseLabel = "Custom Prompts ($1.99)";
       isCustomPromptsAddOn = true;
+    } else if (purchasedPriceId === STRIPE_PRICES.firstRoastSpecial) {
+      purchaseLabel = "First Roast 12 for $0.99";
+    } else if (purchasedPriceId === STRIPE_PRICES.threeRoastSpecial) {
+      purchaseLabel = "Third Roast 10 for $0.99";
     }
 
     return NextResponse.json({

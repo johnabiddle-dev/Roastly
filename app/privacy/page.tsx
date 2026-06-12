@@ -7,14 +7,14 @@ export default function PrivacyPage() {
 
         <h2 className="text-2xl font-semibold mt-8">What we collect</h2>
         <ul className="list-disc pl-6 space-y-2">
-          <li>Photos you upload (processed by Grok AI and immediately deleted after generating roasts)</li>
+          <li>Images/screenshots you upload (processed by Grok AI and immediately deleted after generating roasts)</li>
           <li>Browser ID (stored in your browser localStorage) to track free/paid roast limits</li>
           <li>IP address (for abuse prevention)</li>
           <li>Payment information (handled entirely by Stripe — we never see your card details)</li>
         </ul>
 
         <h2 className="text-2xl font-semibold mt-8">How we use it</h2>
-        <p>We use your photo only to generate roasts. We do not store photos. We use usage data to enforce the free 3-roast limit and paid daily limits.</p>
+        <p>We use your image/screenshot only to generate roasts. We do not store images. We use usage data to enforce the free 3-roast limit and paid daily limits.</p>
 
         <h2 className="text-2xl font-semibold mt-8">Payments</h2>
         <p>All payments are processed by Stripe. We receive confirmation of successful payments but no sensitive card data.</p>

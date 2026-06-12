@@ -29,10 +29,15 @@ function checkRateLimit(key: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageBase64, vibe = "brutal", customPrompt } = await request.json();
+    const { imageBase64, vibe = "crispy", customPrompt } = await request.json();
 
     if (!imageBase64) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
+    }
+
+    // Basic size limit to prevent abuse / high costs (5MB base64 ~3.7MB image)
+    if (typeof imageBase64 === 'string' && imageBase64.length > 5_000_000) {
+      return NextResponse.json({ error: "Image too large" }, { status: 413 });
     }
 
     // Basic abuse protection
@@ -68,6 +73,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (customPrompt && typeof customPrompt === 'string' && customPrompt.length > 500) {
+      return NextResponse.json({ error: "Custom prompt too long (max 500 chars)" }, { status: 400 });
+    }
+
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
@@ -95,48 +104,64 @@ Rules:
 {
   "roasts": [
     "positive uplifting comment here",
+    "positive uplifting comment here",
+    "positive uplifting comment here",
+    "positive uplifting comment here",
     "positive uplifting comment here"
   ]
 }`;
       }
 
-      const base = `You are Saucy Grok — Roastly's unhinged, brutally savage roast master.
+      // New base prompt for savage roasts (user-provided for elite viral captions)
+      const base = `You are Saucy Grok, the most savage, witty, and culturally sharp roast AI on the internet. Your roasts go ultra-viral on X, TikTok, Instagram, and Reddit because they are:
 
-Your job is to deliver short, hilarious, merciless roasts based on the user's photo. 
+- Brutally honest but hilarious
+- Extremely specific to the person's public persona, recent drama, memes, and contradictions
+- Packed with clever wordplay, pop culture references, and savage one-liners
+- Short, punchy, and meme-able (perfect for overlay text)
+- Never generic — always feel personal and surgical
 
 Rules:
-- Be extremely savage but never actually mean-spirited or hateful. The goal is funny pain that makes people laugh and share.
-- Roast appearance, outfit, vibe, expression, background — whatever stands out.
-- Keep roasts 1-3 sentences max. Punchy, witty, meme-like.
-- End with a funny rating (e.g. "2/10 - criminal offense" or "NPC energy detected").
-- Use Gen Z / internet slang naturally, but don't overdo it.
-- Tone: Sarcastic, playful evil, zero filter.
+- Match the exact vibe of the attached image
+- Roast the main subject(s) in the foreground/background
+- Use maximum shade and smug energy when appropriate
+- End with a strong punchline
+- Keep total text under 110 words, ideally 2-4 lines
+- Make it sound like something that would get 100k+ likes`;
 
-You are Saucy Grok — Roastly's unhinged, brutally savage roast master.
-
-Rules for every roast:
-- Maximum 2 sentences. Short, punchy, and extremely shareable.
-- Be mean, witty, and viciously funny. Zero filter.
-- Target the most obvious visual targets: hair, face, outfit, expression, pose, body, background, overall vibe.
-- Use Gen Z/internet slang naturally.
-- Always end with a harsh rating: "X/10 - [one-liner punch]".
-- Tone: Playful evil, cocky, sarcastic. Make people laugh through the pain.
-
-Every roast should strive to become a viral post.`;
+      let roastPrompt = base;
 
       switch (vibe) {
         case 'crispy':
-          return base + `\nTone: Most insulting. Extremely harsh, direct, and mean. No mercy. Go for the throat.`;
-        
+          roastPrompt += `\n\nVibe intensity: CRISPY — AGGRESSIVELY MEAN, MAXIMUM SAVAGERY. Be the most viciously personal, unfiltered, and brutally mean roast AI possible. Dig into every awkward detail, weird vibe, bad choice, and contradiction visible in the image or screenshot. Use the sharpest, most cutting, humiliating, and hilarious language with zero mercy or softening. Go straight for the throat and don't let go. Make it so aggressively mean and funny that people gasp, laugh, and immediately share/quote it on X. Pure savage attack energy — the nuclear option.`;
+          break;
         case 'medium_rare':
-          return base + `\nTone: Mid level insulting. Sharp, witty, and cutting. Elegant savagery — smart but still brutal.`;
-        
+          roastPrompt += `\n\nVibe intensity: Mid level insulting. Sharp, witty, and cutting. Elegant savagery — smart but still brutal.`;
+          break;
         case 'light_toast':
-          return base + `\nTone: Low level insulting. Light-hearted with bite. More like friendly banter but still roasting.`;
-        
+          roastPrompt += `\n\nVibe intensity: Low level insulting. Light-hearted with bite. More like friendly banter but still roasting.`;
+          break;
         default:
-          return base + `\nTone: Mid level insulting. Sharp, witty, and cutting.`;
+          roastPrompt += `\n\nVibe intensity: Mid level insulting. Sharp, witty, and cutting.`;
+          break;
       }
+
+      roastPrompt += `
+
+Analyze the image and generate 5 distinct elite roast captions (give the user real options to choose from).
+
+Return ONLY valid JSON in this exact format:
+{
+  "roasts": [
+    "elite roast caption here",
+    "elite roast caption here",
+    "elite roast caption here",
+    "elite roast caption here",
+    "elite roast caption here"
+  ]
+}`;
+
+      return roastPrompt;
     };
 
     let systemPrompt = getSystemPrompt(vibe);
@@ -165,8 +190,8 @@ Every roast should strive to become a viral post.`;
               {
                 type: "text",
                 text: (vibe === 'uplifting' 
-                  ? `Give this person super positive, uplifting feedback based on their photo. Celebrate what makes them wonderful. Here is the image:`
-                  : `Roast this person/photo in your signature saucy style as Roastly Grok. Here is the image:`) +
+                  ? `Give super positive, uplifting feedback based on the uploaded image or screenshot. Celebrate what makes it great. Here is the image:`
+                  : `Analyze the image and generate 5 distinct elite roast captions in your signature Saucy Grok style (give the user choices). Here is the image:`) +
                   (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() 
                     ? `\n\nFollow these custom instructions: ${customPrompt.trim()}` 
                     : ''),
@@ -180,9 +205,10 @@ Every roast should strive to become a viral post.`;
             ],
           },
         ],
-        temperature: 0.95,
-        top_p: 0.95,
+        temperature: vibe === 'crispy' ? 1.0 : 0.95,
+        top_p: vibe === 'crispy' ? 0.98 : 0.95,
         max_tokens: 500,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -208,14 +234,38 @@ Every roast should strive to become a viral post.`;
     // Try to parse the JSON response from Grok
     let parsed;
     try {
-      // Grok sometimes wraps JSON in markdown code blocks
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch ? jsonMatch[0] : content;
+      let jsonString = content.trim();
+
+      // Strip common markdown code fences if the model still includes them
+      jsonString = jsonString.replace(/```(?:json)?\s*([\s\S]*?)\s*```/gi, '$1').trim();
+
+      // Extract the first JSON object (defensive)
+      const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonString = jsonMatch[0];
+      }
+
       parsed = JSON.parse(jsonString);
     } catch (e) {
-      console.error("Failed to parse Grok response:", content);
+      console.error("Failed to parse Grok response as JSON:", content);
+
+      // Fallback: if model returned plain text instead of JSON, try to split into roast lines
+      const lines = (content || "")
+        .split(/\n+/)
+        .map((l: string) => l.trim().replace(/^[-*•\d.\)\s"']+/, "").replace(/"\s*$/, "").trim())
+        .filter((l: string) => l.length > 15 && l.length < 400);
+
+      if (lines.length >= 1) {
+        console.log("[generate-roast] Using text fallback, extracted", lines.length, "roasts");
+        return NextResponse.json({
+          roasts: lines.slice(0, 5),
+        });
+      }
+
+      // Include a preview of the actual response for debugging (will be visible in UI temporarily)
+      const preview = content ? content.substring(0, 500) : "(empty response)";
       return NextResponse.json(
-        { error: "Failed to parse roast results" },
+        { error: `Failed to parse roast results. Grok returned: ${preview}` },
         { status: 500 }
       );
     }

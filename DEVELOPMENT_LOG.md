@@ -14,7 +14,7 @@
 
 ## Project Overview
 
-Roastly lets users upload a photo, get 5 elite roast options from Grok-4.3 vision (Crispy, Medium Rare, Light Toast, or Uplifting), pick a favorite, generate a beautiful 1080x1920 PNG card (with photo, roast text, red "R" logo, "click here to roast back" CTA + domain), and share it.
+Roastly lets users upload any screenshot, photo, text convo, meme — whatever — and get 5 elite roast options from Grok-4.3 vision (Crispy, Medium Rare, Light Toast, or Uplifting), pick a favorite, generate a beautiful 1080x1920 PNG card (with image, roast text, red "R" logo, "click here to roast back" CTA + domain), and share it. Roast anything.
 
 **Monetization**:
 - Free: 3 roasts total (hybrid IP + browserId tracking, versioned resets).
@@ -260,4 +260,28 @@ The source of truth for instructions is this log + dev-chat-messages.json + the 
 - Content: more promo threads from the folder.
 
 **This log + the committed dev-chat-messages.json + README/HANDOFF/ROADMAP should give a strong restart point.**
+
+
+## Terminal Access for Future Sessions
+
+To quickly resume this exact development terminal context:
+
+- Open any terminal window.
+- Type: `roastly`
+
+This attaches to a persistent `tmux` session named `roastly-dev` that was created with project context, current directory, and reminders about key paths (dev-chat, test images folder, owner ID, live site, etc.).
+
+Direct command (if alias not available): `tmux attach -t roastly-dev`
+
+The alias `roastly` was added to `~/.zshrc` for permanence.
+
+Background monitors for dev-chat (polling + log tail) are typically kept running separately. If needed, re-start with:
+```bash
+cd ~/Developer/roastly
+touch dev-chat.log
+tail -f dev-chat.log &
+# (and the polling loop if desired)
+```
+
+This setup allows easy re-entry even after closing terminals or reboots (tmux survives terminal closes).
 

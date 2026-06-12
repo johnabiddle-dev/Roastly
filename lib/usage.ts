@@ -10,6 +10,7 @@ export type UsageRecord = {
   hasCustomPrompts: boolean;  // true if user paid the $1.99 add-on to unlock custom prompts
   referredBy?: string;        // browserId of the person who referred this user
   bonusRoasts: number;        // extra roasts earned via referrals etc.
+  version?: string;           // for resetting counts on new versions
 };
 
 export const usageStore = new Map<string, UsageRecord>();
@@ -21,12 +22,39 @@ export function getToday() {
 export const FREE_LIMIT = 3;
 export const PAID_DAILY_LIMIT = 10;
 
+export const USAGE_VERSION = 'v3';
+
 const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || '';
 
 function isOwner(browserId: string): boolean {
   const cleanBrowser = (browserId || '').trim();
   const cleanOwner = (OWNER_BROWSER_ID || '').trim();
   return !!cleanOwner && cleanBrowser === cleanOwner;
+}
+
+function getOrCreateRecord(userId: string): UsageRecord {
+  const today = getToday();
+  let record = usageStore.get(userId);
+  if (!record) {
+    record = {
+      freeUsed: 0,
+      paidDailyUsed: 0,
+      paidDate: today,
+      isPaid: false,
+      hasCustomPrompts: false,
+      bonusRoasts: 0,
+      version: USAGE_VERSION,
+    };
+    usageStore.set(userId, record);
+  } else if (record.version !== USAGE_VERSION) {
+    // Reset free/paid counts for previous users when USAGE_VERSION is bumped.
+    // This is the standard way to globally reset counters for all users (free lifetime + paid daily).
+    // Keeps: isPaid, hasCustomPrompts, bonusRoasts, referredBy.
+    record.freeUsed = 0;
+    record.paidDailyUsed = 0;
+    record.version = USAGE_VERSION;
+  }
+  return record;
 }
 
 export function getUserId(req: NextRequest): string {
@@ -56,18 +84,7 @@ export function getUsage(userId: string) {
     };
   }
 
-  let record = usageStore.get(userId);
-  if (!record) {
-    record = {
-      freeUsed: 0,
-      paidDailyUsed: 0,
-      paidDate: today,
-      isPaid: false,
-      hasCustomPrompts: false,
-      bonusRoasts: 0,
-    };
-    usageStore.set(userId, record);
-  }
+  const record = getOrCreateRecord(userId);
 
   if (record.isPaid) {
     if (record.paidDate !== today) {
@@ -128,18 +145,7 @@ export function consumeOneRoast(userId: string): {
     };
   }
 
-  let record = usageStore.get(userId);
-  if (!record) {
-    record = {
-      freeUsed: 0,
-      paidDailyUsed: 0,
-      paidDate: today,
-      isPaid: false,
-      hasCustomPrompts: false,
-      bonusRoasts: 0,
-    };
-    usageStore.set(userId, record);
-  }
+  const record = getOrCreateRecord(userId);
 
   if (record.isPaid) {
     if (record.paidDate !== today) {
@@ -202,14 +208,7 @@ export function consumeOneRoast(userId: string): {
 }
 
 export function markUserAsPaid(userId: string) {
-  const record = usageStore.get(userId) || {
-    freeUsed: 0,
-    paidDailyUsed: 0,
-    paidDate: getToday(),
-    isPaid: false,
-    hasCustomPrompts: false,
-    bonusRoasts: 0,
-  };
+  const record = getOrCreateRecord(userId);
   record.isPaid = true;
   usageStore.set(userId, record);
 
@@ -218,14 +217,7 @@ export function markUserAsPaid(userId: string) {
 }
 
 export function markCustomPromptsUnlocked(userId: string) {
-  const record = usageStore.get(userId) || {
-    freeUsed: 0,
-    paidDailyUsed: 0,
-    paidDate: getToday(),
-    isPaid: false,
-    hasCustomPrompts: false,
-    bonusRoasts: 0,
-  };
+  const record = getOrCreateRecord(userId);
   record.hasCustomPrompts = true;
   usageStore.set(userId, record);
 
@@ -234,34 +226,12 @@ export function markCustomPromptsUnlocked(userId: string) {
 }
 
 export function grantBonusRoasts(userId: string, amount: number) {
-  let record = usageStore.get(userId);
-  if (!record) {
-    record = {
-      freeUsed: 0,
-      paidDailyUsed: 0,
-      paidDate: getToday(),
-      isPaid: false,
-      hasCustomPrompts: false,
-      bonusRoasts: 0,
-    };
-    usageStore.set(userId, record);
-  }
+  const record = getOrCreateRecord(userId);
   record.bonusRoasts = (record.bonusRoasts || 0) + Math.max(0, amount);
 }
 
 export function setReferredBy(userId: string, referrerId: string) {
-  let record = usageStore.get(userId);
-  if (!record) {
-    record = {
-      freeUsed: 0,
-      paidDailyUsed: 0,
-      paidDate: getToday(),
-      isPaid: false,
-      hasCustomPrompts: false,
-      bonusRoasts: 0,
-    };
-    usageStore.set(userId, record);
-  }
+  const record = getOrCreateRecord(userId);
   if (!record.referredBy) {
     record.referredBy = referrerId;
   }

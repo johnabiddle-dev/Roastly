@@ -2,7 +2,7 @@
 
 **Brutal (and sometimes uplifting) AI roasts powered by Grok.**
 
-Upload a photo. Get roasted by Grok-4.3 vision. Share the savage (or sweet) results as beautiful cards that include your photo + the roast + a buried link back to Roastly.
+Roast *anything*. Upload any screenshot, photo, text convo, meme — whatever. Get roasted by Grok-4.3 vision. Share the savage (or sweet) results as beautiful cards that include your image + the roast + a buried link back to Roastly.
 
 Free: 3 roasts total.  
 Paid: $0.99–$9.99 one-time packs or $19.99/mo Unlimited that unlock 10 roasts/day + the $1.99 "Create Your Own Prompt" add-on.
@@ -11,10 +11,11 @@ Paid: $0.99–$9.99 one-time packs or $19.99/mo Unlimited that unlock 10 roasts/
 
 - Fully functional Next.js 16 app with Stripe Checkout (including Apple Pay)
 - Real Grok vision roasts with multiple vibes (brutal, savage, unhinged, playful, mild, uplifting)
-- High-quality canvas-generated shareable PNG cards (photo + text + custom red "R" Roasty icon + "click here to roast back" CTA)
+- High-quality canvas-generated shareable PNG cards (any screenshot, photo, text convo, meme + text + custom red "R" Roasty icon + "click here to roast back" CTA)
 - Usage caps enforced server-side (free 3 total, paid 10/day)
 - Custom prompt feature gated behind the $1.99 one-time add-on
 - In-app upgrade modal that triggers exactly when users hit limits
+- Marketed as "roast anything" — not limited to selfies
 
 ## Making Money With It
 
@@ -48,6 +49,12 @@ Owner unlimited access:
 3. In your browser console on the site: `localStorage.setItem('roastly-browser-id', 'THE-EXACT-UUID')`
 This gives you (and only you) permanent unlimited roasts + custom prompts. No public backdoors.
 
+**CRITICAL SECURITY NOTE:** The OWNER_BROWSER_ID is the master key for the entire site (unlimited roasts, custom prompts, direct posting as @roastlyapp on X, dev-chat control, etc.). Treat it like a high-value password:
+- Never commit it.
+- Never share the value.
+- Set it only on devices you fully control.
+- Rotate periodically (new UUID in Vercel + update your devices' localStorage) if concerned about leakage.
+
 How to add the env var in Vercel:
 - Use the search bar at the top to find and click your "roastly" project.
 - Once inside the project page, click the **Settings** tab (top right, gear icon).
@@ -68,15 +75,91 @@ javascript:(function(){localStorage.setItem('roastly-browser-id','E36C00A1-8B98-
 5. Hard refresh the page.
 You should now have unlimited roasts on phone too. Use the exact same ID on all your devices.
 
+**Warning:** Bookmarklets can be dangerous if from untrusted sources. Only use the one you created yourself from the exact UUID in your Vercel env.
+
+## X API Keys for posting as @roastlyapp
+
+To enable direct posting from the app (the owner-only "Post to X" button inside the card modal, and phone commands like "post on X as @roastlyapp: ..."):
+
+We use **OAuth 1.0a user context** (4 keys). The "App-only authentication" / Bearer token is **not** sufficient — it can't post as the @roastlyapp account.
+
+What you need (in this order):
+
+1. Go to **https://console.x.com** and sign in **as the @roastlyapp account** (the brand account — not your personal one).
+
+2. In the left sidenav, expand **Apps** (or navigate to your Project > Apps). Click the App you created for posting (e.g. "Roastly Posting" or similar).
+
+3. **First, set the permissions** (do this before regenerating keys if you want posting to work):
+   - On the App page, find the **User authentication settings** section/card.
+   - Click **Set up** (or Edit).
+   - Enable / select **OAuth 1.0a**.
+   - Under **App permissions**, select **Read and Write** (Read and Write and Direct Messages also works).
+   - Under **Type of App**, choose **Web App, Automated App or Bot** (or similar server-side option).
+   - **Callback URI / Redirect URL** (required by the portal):
+     - Add: `https://roastly-app.vercel.app`
+     - Also add: `http://127.0.0.1` (useful for local testing)
+     Multiple are allowed (up to 10). No trailing slash needed in most cases.
+   - **Website URL** (if shown): `https://roastly-app.vercel.app`
+   - If the form also asks for **Terms of Service URL** and **Privacy Policy URL**:
+     - Terms: `https://roastly-app.vercel.app/terms`
+     - Privacy: `https://roastly-app.vercel.app/privacy`
+   - Click **Save**.
+
+   **Note:** Changing permissions usually requires you to regenerate the Access Token afterward so it gets the new scopes.
+
+4. Go to the **Keys and tokens** tab (top tabs or menu on the App).
+
+   This is the screen where you see sections like "app-only authentication" and "oauth1.0 keys".
+
+   - Look for **Consumer Keys** / **API Key and Secret** (these are often the ones showing only the last 6 characters, masked):
+     - This is your Consumer Key (X_API_KEY) and Consumer Secret (X_API_SECRET).
+     - Click **Regenerate** next to the masked values to reveal the full ones.
+
+   - Look for **Access Token & Secret** (under Authentication Tokens, OAuth 1.0a, or similar — these are also usually masked showing only last 6 characters):
+     - Click **Generate** or **Regenerate** here (while logged in as @roastlyapp) to get the full Access Token (X_ACCESS_TOKEN) and Access Token Secret (X_ACCESS_SECRET) for this account.
+
+   - Ignore the **Bearer Token** section (that's the pure app-only one).
+
+   Regenerating shows the **full unmasked values only once** (or briefly). The masked versions (last 6 characters) cannot be used — you must use the full revealed strings. Copy them immediately. Never use the starred/masked versions.
+
+   The four you need (map exactly to these):
+   - Consumer / API Key          → X_API_KEY
+   - Consumer / API Key Secret   → X_API_SECRET
+   - Access Token                → X_ACCESS_TOKEN
+   - Access Token Secret         → X_ACCESS_SECRET
+
+5. In Vercel:
+   - Open the "roastly" project.
+   - Settings (top) → Environment Variables (sidebar).
+   - Add New for each of the four keys above.
+   - Paste the **full values**.
+   - Environment: **Production** (at minimum).
+   - Add them one by one.
+
+6. After all four are saved, go to Deployments tab → Redeploy the latest deployment.
+
+Once redeployed (after adding the 4 X_ keys), owner-only "Post to X" button appears inside the shareable card modal (after you tap a roast result to open the card and pick your favorite). It posts the selected roast text + the original photo directly from @roastlyapp and returns the link.
+
+(The OAuth 2.0 Client ID/Secret are not used; only the four OAuth 1.0a keys from the Consumer + Access Token sections.)
+
+You can also trigger posts from the /dev-chat phone interface with instructions like:
+"post on X as @roastlyapp: Here is a savage roast of this vibe... [or ask me to generate a full thread using the promo images]"
+
 ## Environment Variables (for local)
 
 ```
 XAI_API_KEY=...
 STRIPE_SECRET_KEY=...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# For posting as @roastlyapp (optional for local testing of the post button)
+X_API_KEY=...
+X_API_SECRET=...
+X_ACCESS_TOKEN=...
+X_ACCESS_SECRET=...
 ```
 
-For production, set the live Stripe keys + XAI key in your Vercel dashboard.
+For production, set the live Stripe keys + XAI key + the 4 X_ keys in your Vercel dashboard (see the "X API Keys for posting as @roastlyapp" section above).
 
 ## Deployment
 
@@ -88,7 +171,43 @@ This app was originally built in collaboration, but per the owner's request, **R
 
 ## Contact / Feedback
 
+## Dev / Phone ↔ Computer Bridge
+
+There is a private owner-only live instruction channel for continuing work / making tweaks from phone (while on the road, etc.).
+
+URL: https://roastly-app.vercel.app/dev-chat (gated by OWNER_BROWSER_ID UUID — same as unlimited access).
+
+**How it works for execution:**
+- Send messages/instructions from phone (e.g. "update the roast prompt to [new text]", "add a share to X button", "change the free limit to 5", "deploy", or "post on X as @roastlyapp: generate a thread promoting the app").
+- I have a live monitor polling the API. New messages trigger me to execute the requested changes (edits, builds, deploys, etc.) using my tools.
+- The page shows a live-updating list of sent messages.
+- Use the bottom draft area for notes; the main input is for actionable instructions.
+- Shareable link for syncing state between your devices.
+
+It is fully owner-gated (401 for others). No public exposure. Messages go through the secure /api/dev-chat (owner header required). No impact on main app.
+
+**Security:** The dev-chat gives the AI (me) the ability to make code changes, run deploys, and post to X as the brand. Only you should ever have the owner ID. If compromised, an attacker could instruct changes or post spam as @roastlyapp.
+
+This lets you drive development from your phone without needing the computer.
+
 If you're a user or potential partner, the best way to reach the project is through the app itself or by posting roasts publicly with the link.
+
+## Testing Custom Images via Dev Chat
+
+Drop test photos (jpg/png) into `~/Desktop/Roastly images/`.
+
+Then instruct from dev-chat (or here):
+
+- "generate 5 crispy roasts using pexels-xxx.jpg from the Roastly images folder"
+- "post the 2nd roast to X as @roastlyapp using that image"
+
+I will:
+- Locate + resize + base64 the image from the folder
+- Call the live /api/generate-roast as owner (unlimited)
+- Return the options
+- Execute post-to-X on request (attaches the original image + chosen roast text)
+
+Great for testing new prompts/vibes or creating X content from your phone.
 
 ---
 

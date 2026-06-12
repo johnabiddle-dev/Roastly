@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { STRIPE_PRICES } from '@/lib/stripe';
 
 export default function RoastlyLanding() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
+  const [refLink, setRefLink] = useState('https://roastly-app.vercel.app/roast');
 
   const getOrCreateBrowserId = () => {
     if (typeof window === "undefined") return "server";
@@ -15,6 +16,12 @@ export default function RoastlyLanding() {
     }
     return id;
   };
+
+  // Set ref link after mount to avoid hydration mismatch (server vs client localStorage)
+  useEffect(() => {
+    const id = getOrCreateBrowserId();
+    setRefLink(`https://roastly-app.vercel.app/roast?ref=${id}`);
+  }, []);
 
   const handleUploadClick = () => {
     // The real flow is at /roast. This button just scrolls or links for marketing.
@@ -78,36 +85,21 @@ export default function RoastlyLanding() {
         <div className="absolute inset-0 z-20 opacity-25">
           {/* Image 1 - visible on mobile */}
           <div className="absolute top-8 left-8 w-44 h-44 rotate-[-14deg] overflow-hidden rounded-3xl">
-            <img src="https://picsum.photos/id/1005/400/400" className="w-full h-full object-cover" />
+            <img src="https://picsum.photos/id/1005/400/400" loading="lazy" className="w-full h-full object-cover" />
           </div>
           {/* Image 2 - hidden on mobile for cleaner/faster load */}
           <div className="absolute top-24 right-12 w-36 h-36 rotate-[11deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/1011/400/400" className="w-full h-full object-cover" />
+            <img src="https://picsum.photos/id/1011/400/400" loading="lazy" className="w-full h-full object-cover" />
           </div>
           {/* Image 3 - visible on mobile */}
           <div className="absolute top-48 left-24 w-40 h-40 rotate-[18deg] overflow-hidden rounded-3xl">
-            <img src="https://picsum.photos/id/160/400/400" className="w-full h-full object-cover" />
+            <img src="https://picsum.photos/id/160/400/400" loading="lazy" className="w-full h-full object-cover" />
           </div>
           {/* Image 4 - hidden on mobile */}
           <div className="absolute bottom-20 right-20 w-48 h-48 rotate-[-8deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/201/400/400" className="w-full h-full object-cover" />
+            <img src="https://picsum.photos/id/201/400/400" loading="lazy" className="w-full h-full object-cover" />
           </div>
-          {/* Image 5 - hidden on mobile */}
-          <div className="absolute bottom-32 left-12 w-32 h-32 rotate-[22deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/29/400/400" className="w-full h-full object-cover" />
-          </div>
-          {/* Image 6 - hidden on mobile */}
-          <div className="absolute top-16 right-40 w-28 h-28 rotate-[-19deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/1006/400/400" className="w-full h-full object-cover" />
-          </div>
-          {/* Image 7 - hidden on mobile */}
-          <div className="absolute bottom-10 right-44 w-36 h-36 rotate-[7deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/251/400/400" className="w-full h-full object-cover" />
-          </div>
-          {/* Image 8 - hidden on mobile */}
-          <div className="absolute top-40 left-44 w-30 h-30 rotate-[-25deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/1009/400/400" className="w-full h-full object-cover" />
-          </div>
+
         </div>
 
         {/* Hero Content */}
@@ -121,7 +113,7 @@ export default function RoastlyLanding() {
           </h1>
 
           <p className="text-xl sm:text-2xl text-zinc-400 mb-10 max-w-xl mx-auto">
-            Snap a photo on your phone. Get roasted by Grok in seconds.<br />
+            Upload any screenshot, photo, text convo, meme — whatever. Get roasted by Grok in seconds.<br />
             Share the beautiful card instantly with friends.
           </p>
 
@@ -129,7 +121,7 @@ export default function RoastlyLanding() {
             href="/roast"
             className="inline-block min-h-[52px] bg-red-600 active:bg-red-700 transition-all text-white text-lg sm:text-xl font-semibold px-8 sm:px-10 py-3 sm:py-4 rounded-2xl active:scale-[0.985] touch-manipulation"
           >
-            Upload photo & get roasted by Grok →
+            Upload anything & get roasted by Grok →
           </a>
 
           <p className="mt-4 text-sm text-zinc-500">
@@ -169,7 +161,7 @@ export default function RoastlyLanding() {
         </div>
 
         <p className="text-center text-zinc-500 text-xs sm:text-sm mt-6 sm:mt-8">
-          These are real roasts people got on their phones. Yours will be worse. Share the card instantly.
+          These are real roasts people got from screenshots, photos, convos — whatever. Yours will be worse. Share the card instantly.
         </p>
       </div>
 
@@ -210,7 +202,7 @@ export default function RoastlyLanding() {
             <button
               onClick={() => handleCheckout(STRIPE_PRICES.starter)}
               disabled={isLoading !== null}
-              className="mt-auto w-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50"
+              className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
             >
               {isLoading === STRIPE_PRICES.starter ? "Processing..." : "Buy Starter Pack"}
             </button>
@@ -232,7 +224,7 @@ export default function RoastlyLanding() {
             <button
               onClick={() => handleCheckout(STRIPE_PRICES.popular)}
               disabled={isLoading !== null}
-              className="mt-auto w-full bg-red-600 hover:bg-red-500 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50"
+              className="mt-auto w-full min-h-[48px] bg-red-600 active:bg-red-500 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
             >
               {isLoading === STRIPE_PRICES.popular ? "Processing..." : "Buy Popular Pack"}
             </button>
@@ -251,7 +243,7 @@ export default function RoastlyLanding() {
             <button
               onClick={() => handleCheckout(STRIPE_PRICES.heavy)}
               disabled={isLoading !== null}
-              className="mt-auto w-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50"
+              className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
             >
               {isLoading === STRIPE_PRICES.heavy ? "Processing..." : "Buy Heavy Pack"}
             </button>
@@ -272,7 +264,7 @@ export default function RoastlyLanding() {
             <button
               onClick={() => handleCheckout(STRIPE_PRICES.unlimited)}
               disabled={isLoading !== null}
-              className="mt-auto w-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50"
+              className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
             >
               {isLoading === STRIPE_PRICES.unlimited ? "Processing..." : "Get Unlimited"}
             </button>
@@ -290,7 +282,7 @@ export default function RoastlyLanding() {
         <p className="text-zinc-400 mb-2 text-sm sm:text-base font-medium">Share your link — friends get extra free roasts</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
           <a 
-            href={`https://roastly-app.vercel.app/roast?ref=${typeof window !== 'undefined' ? (localStorage.getItem('roastly-browser-id') || getOrCreateBrowserId()) : ''}`}
+            href={refLink}
             className="text-red-400 hover:text-red-300 underline text-base sm:text-lg font-medium break-all"
             target="_blank"
             rel="noopener noreferrer"
@@ -307,6 +299,18 @@ export default function RoastlyLanding() {
             className="min-h-[44px] bg-emerald-600 active:bg-emerald-700 text-white text-xs sm:text-sm px-4 py-2 rounded-2xl transition-colors font-semibold touch-manipulation"
           >
             Copy referral link
+          </button>
+          <button
+            onClick={() => {
+              const id = getOrCreateBrowserId();
+              const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
+              const text = `Saucy Grok just cooked my screenshot with an elite roast 🔥😂\n\nUpload any photo, convo, meme — get roasted by Grok. Free to try:\n${link}\n\nFollow @roastlyapp on X for more. #Grok #AI #Roast`;
+              navigator.clipboard.writeText(text);
+              alert("Viral X post text copied! Paste + attach a roast card image.");
+            }}
+            className="min-h-[44px] bg-zinc-800 active:bg-zinc-700 text-white text-xs sm:text-sm px-4 py-2 rounded-2xl transition-colors font-semibold touch-manipulation"
+          >
+            Copy X post text
           </button>
         </div>
         <p className="text-[10px] sm:text-xs text-zinc-500 mt-2">Friends get extra free roasts.<br className="sm:hidden" /> You get +5 bonus when they buy.</p>

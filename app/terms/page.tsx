@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white px-6 py-12 max-w-2xl mx-auto">
@@ -6,11 +8,11 @@ export default function TermsPage() {
         <p>Last updated: June 2026</p>
 
         <h2 className="text-2xl font-semibold mt-8">The Service</h2>
-        <p>Roastly lets you upload photos and receive AI-generated roasts (or uplifting comments) using Grok. You can buy packs that give you 10 roasts per day on this browser/device.</p>
+        <p>Roastly lets you upload any screenshot, photo, text convo, meme — whatever — and receive AI-generated roasts (or uplifting comments) using Grok. You can buy packs that give you 10 roasts per day on this browser/device.</p>
 
         <h2 className="text-2xl font-semibold mt-8">Your Content</h2>
-        <p>You own the photos you upload. By uploading, you give us permission to send the photo to the Grok AI API for processing. We do not keep your photos.</p>
-        <p>Do not upload photos of other people without their consent, illegal content, or anything that violates platform rules.</p>
+        <p>You own the images/screenshots you upload. By uploading, you give us permission to send the image to the Grok AI API for processing. We do not keep your images.</p>
+        <p>Do not upload images of other people without their consent, illegal content, or anything that violates platform rules.</p>
 
         <h2 className="text-2xl font-semibold mt-8">Payments & Refunds</h2>
         <p>All sales are final. The roasts are digital and delivered instantly. If something goes wrong with a purchase, contact us and we will try to help (we can refund via Stripe in reasonable cases).</p>
@@ -26,7 +28,7 @@ export default function TermsPage() {
 
         <p className="text-sm text-zinc-500 mt-12">By using Roastly you agree to these terms. Have fun, don&apos;t be an asshole (unless you paid for Unlimited Roasts).</p>
       </div>
-      <a href="/" className="inline-block mt-8 text-red-400 hover:text-red-300">← Back to Roastly</a>
+      <Link href="/" className="inline-block mt-8 text-red-400 hover:text-red-300">← Back to Roastly</Link>
     </div>
   );
 }

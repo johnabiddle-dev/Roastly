@@ -87,7 +87,7 @@ export default function SuccessPage() {
 
         <a 
           href="/" 
-          className="inline-block bg-red-600 hover:bg-red-500 px-8 py-3 rounded-2xl font-semibold"
+          className="inline-block min-h-[48px] bg-red-600 active:bg-red-500 px-8 py-3 rounded-2xl font-semibold touch-manipulation"
         >
           Back to Roastly
         </a>
