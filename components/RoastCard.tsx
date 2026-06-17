@@ -160,6 +160,15 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           >
             Send to @roastlyapp
           </button>
+
+          {isOwner && onPostToX && (
+            <button
+              onClick={onPostToX}
+              className="flex-1 min-h-[48px] bg-sky-600 active:bg-sky-500 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+            >
+              Post to X as @roastlyapp
+            </button>
+          )}
         </div>
 
         {/* Link hint */}
