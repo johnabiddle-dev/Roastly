@@ -10,6 +10,7 @@ export default function RoastPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMessage, setGeneratingMessage] = useState('');
   const [roasts, setRoasts] = useState<string[]>([]);
   const [showCard, setShowCard] = useState(false);
   const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
@@ -18,9 +19,6 @@ export default function RoastPage() {
   const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean; bonusRoasts?: number; referredBy?: string } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // Special milestone deal pop-ups
-  const [showFirstRoastDeal, setShowFirstRoastDeal] = useState(false);
-  const [showThreeRoastDeal, setShowThreeRoastDeal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
 
   const getOrCreateBrowserId = () => {
@@ -163,6 +161,19 @@ export default function RoastPage() {
     if (!selectedFile) return;
 
     setIsGenerating(true);
+    const messages = [
+      "Analyzing every pixel...",
+      "Grok is cooking...",
+      "Finding the weak spots...",
+      "Reading the room (and destroying it)...",
+      "Crafting elite burns..."
+    ];
+    setGeneratingMessage(messages[0]);
+    let msgIndex = 0;
+    const msgInterval = setInterval(() => {
+      msgIndex = (msgIndex + 1) % messages.length;
+      setGeneratingMessage(messages[msgIndex]);
+    }, 420);
 
     try {
       setError("");
@@ -170,14 +181,14 @@ export default function RoastPage() {
       const browserId = getOrCreateBrowserId();
       const clientUsed = getClientFreeUsed(browserId);
 
-      // Client-side check for free limit (in case server forgot due to serverless)
       if (usage && usage.remaining <= 0) {
         setShowUpgradeModal(true);
         setIsGenerating(false);
+        clearInterval(msgInterval);
+        setGeneratingMessage('');
         return;
       }
 
-      // Resize and convert image to JPEG base64 (better for mobile/HEIC/large screenshots or photos)
       const base64 = await resizeAndConvertToBase64(selectedFile);
 
       const response = await fetch("/api/generate-roast", {
@@ -199,27 +210,8 @@ export default function RoastPage() {
         setError(data.error);
       } else if (data.roasts && data.roasts.length > 0) {
         setRoasts(data.roasts);
-        // Update client-side count
         setClientFreeUsed(browserId, clientUsed + 1);
-        // Server already consumed one roast (enforced in /api/generate-roast). Refresh display count.
         await fetchUsage();
-
-        // Special milestone pop-up deals
-        if (usage && !usage.isPaid) {
-          const used = usage.used || (clientUsed + 1);
-
-          // After their very first roast (before or when they create the first card)
-          if (used === 1 && !localStorage.getItem('roastly-first-deal-shown')) {
-            localStorage.setItem('roastly-first-deal-shown', 'true');
-            setTimeout(() => setShowFirstRoastDeal(true), 1100);
-          }
-
-          // After they generate 3 roasts (hitting the free limit)
-          if (used >= 3 && !localStorage.getItem('roastly-three-deal-shown')) {
-            localStorage.setItem('roastly-three-deal-shown', 'true');
-            setTimeout(() => setShowThreeRoastDeal(true), 800);
-          }
-        }
       } else {
         setError("No roasts were generated. Try again.");
       }
@@ -227,6 +219,8 @@ export default function RoastPage() {
       console.error(error);
       setError("Something went wrong while generating roasts.");
     } finally {
+      clearInterval(msgInterval);
+      setGeneratingMessage('');
       setIsGenerating(false);
     }
   };
@@ -315,9 +309,9 @@ export default function RoastPage() {
   const copyViralXPost = () => {
     const id = getOrCreateBrowserId();
     const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-    const text = `Saucy Grok just hit me with this elite roast caption 🔥😂\n\nNew updated prompts for even better viral roasts. Free to try (new users get fresh attempts):\n${link}\n\nTag someone who needs roasting 👇 #Grok #AI #Roast`;
+    const text = `Saucy Grok just roasted my screenshot with a disgusting banger 🔥\n\nWorks on anything: texts, X posts, photos, group chats.\nFree to try:\n${link}\n\nTag who needs it 👇 #Roastly #Grok #AI`;
     navigator.clipboard.writeText(text);
-    alert("Viral X post text copied! Paste it with your downloaded roast card image for best results.");
+    alert("Viral X post text copied! Paste + attach the downloaded card image.");
   };
 
   // Checkout handler (same pattern as landing page)
@@ -377,7 +371,7 @@ export default function RoastPage() {
             Let's do this.
           </h1>
           <p className="text-xl text-zinc-400">
-            Upload any screenshot or image and get roasted by AI
+            Upload screenshots, photos, texts, X posts, pets — roast literally anything
           </p>
         </div>
 
@@ -403,7 +397,7 @@ export default function RoastPage() {
                       : 'Your Light Toast roasts'}
               </h2>
               <div className="space-y-4">
-                <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast below to create a shareable card with it (includes your screenshot or image). You get 5 options per generation.</p>
+                <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast to build the beautiful shareable card. 5 options. Works on screenshots, chats, photos — anything.</p>
                 {roasts.map((roast, index) => (
                   <div 
                     key={index} 
@@ -442,7 +436,32 @@ export default function RoastPage() {
               >
                 Upload Different Image
               </button>
+              <button
+                onClick={() => {
+                  const vibes = ['crispy', 'medium_rare', 'light_toast', 'uplifting'] as const;
+                  const next = vibes[(vibes.indexOf(vibe) + 1) % vibes.length];
+                  setVibe(next);
+                  handleRegenerate();
+                }}
+                disabled={isGenerating}
+                className="min-h-[44px] bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-500 px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium transition-all active:scale-[0.985] touch-manipulation"
+              >
+                Different Vibe
+              </button>
             </div>
+
+            {/* Soft, non-pushy upsell — only appears for free users after a great roast experience */}
+            {usage && !usage.isPaid && usage.remaining <= 2 && (
+              <div className="mt-6 text-center p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
+                <p className="text-sm text-zinc-400 mb-2">These roasts hitting? Get 10 fresh ones every day for the price of a coffee.</p>
+                <button 
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="text-emerald-400 hover:text-emerald-300 text-sm underline active:text-emerald-200"
+                >
+                  See $0.99 packs →
+                </button>
+              </div>
+            )}
 
             {/* Subtle referral encouragement - keeps UI clean, mobile friendly */}
             <div className="mt-4 text-center">
@@ -478,15 +497,30 @@ export default function RoastPage() {
             )}
           </div>
         ) : !previewUrl ? (
-          /* Upload Area - mobile optimized with good touch target and spacing */
-          <div className="border-2 border-dashed border-zinc-700 rounded-3xl p-8 sm:p-12 text-center hover:border-zinc-500 active:border-zinc-400 transition-colors">
+          /* Upload Area — drag & drop + click, fast & delightful */
+          <div
+            onDrop={(e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files?.[0];
+              if (file && file.type.startsWith('image/')) {
+                setError("");
+                setSelectedFile(file);
+                const reader = new FileReader();
+                reader.onload = (event) => setPreviewUrl(event.target?.result as string);
+                reader.readAsDataURL(file);
+              }
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => e.preventDefault()}
+            className="border-2 border-dashed border-zinc-700 rounded-3xl p-8 sm:p-12 text-center hover:border-zinc-500 active:border-zinc-400 transition-colors"
+          >
             <div className="mx-auto w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-6">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v-4m0 0V8m0 4h16m-8-4v8m-4 4h8" />
               </svg>
             </div>
             <h3 className="text-xl font-semibold mb-2">Upload anything</h3>
-            <p className="text-zinc-400 mb-6">Screenshots, photos, text convos, memes, emails, anything — upload and get roasted</p>
+            <p className="text-zinc-400 mb-6">Photo, screenshot, text convo, meme, email, X post — drop it or tap</p>
             
             <label className="inline-block bg-white text-black px-8 py-3 min-h-[48px] rounded-2xl font-semibold cursor-pointer active:bg-zinc-100 transition-colors touch-manipulation">
               Choose Image or Screenshot
@@ -497,6 +531,7 @@ export default function RoastPage() {
                 className="hidden" 
               />
             </label>
+            <p className="text-[10px] text-zinc-500 mt-4">Drag &amp; drop works too</p>
           </div>
         ) : (
           /* Preview + Generate Button */
@@ -550,7 +585,7 @@ export default function RoastPage() {
                   <textarea
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
-                    placeholder="e.g. Roast like a sarcastic New Yorker who hates fashion. Focus on the shoes and hair."
+                    placeholder="e.g. Roast this text convo like a savage stand-up comic. Focus on the awkward replies."
                     className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-base text-white placeholder:text-zinc-500 min-h-[80px] resize-y"
                   />
                   <p className="text-[10px] text-zinc-500 mt-1 text-center">Your custom instructions will guide the roast style.</p>
@@ -578,7 +613,7 @@ export default function RoastPage() {
                   className="bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-zinc-700 transition-colors text-white text-xl font-semibold px-12 py-4 rounded-2xl touch-manipulation active:scale-[0.985]"
                 >
                   {isGenerating 
-                    ? "Generating roasts..." 
+                    ? (generatingMessage || "Generating roasts...") 
                     : usage && usage.remaining <= 0 
                       ? (usage.isPaid ? "Daily limit reached — Upgrade" : "Free limit reached — Unlock more")
                       : "Get Roasted →"}
@@ -619,89 +654,8 @@ export default function RoastPage() {
         />
       )}
 
-      {/* First Roast Special Deal Pop-up (after first roast + card creation) */}
-      {showFirstRoastDeal && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[65] p-4">
-          <div className="bg-zinc-900 rounded-3xl max-w-md w-full p-6 text-center">
-            <div className="text-4xl mb-3">🔥</div>
-            <h2 className="text-2xl font-bold mb-2">Nice first roast!</h2>
-            <p className="text-zinc-400 mb-4">
-              You're on a roll. Grab this early-commit bonus before it disappears:
-            </p>
-
-            <div className="bg-zinc-950 border-2 border-emerald-600 rounded-2xl p-5 mb-6">
-              <div className="text-3xl font-bold">$0.99</div>
-              <div className="text-xl">12 Roasts</div>
-              <div className="text-xs text-emerald-400 mt-2">First Roast 12 for $0.99 — One-time special</div>
-            </div>
-
-            <p className="text-xs text-zinc-500 mb-5">
-              Special early-bird offer after your very first roast. (Regular Starter is still available at $0.99 for 5 roasts.)
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => {
-                  setShowFirstRoastDeal(false);
-                  handleCheckout(STRIPE_PRICES.firstRoastSpecial);
-                }}
-                disabled={isCheckingOut !== null}
-                className="flex-1 min-h-[48px] bg-emerald-600 active:bg-emerald-500 text-white py-3 rounded-2xl font-semibold text-sm transition-colors touch-manipulation disabled:opacity-60"
-              >
-                {isCheckingOut === STRIPE_PRICES.firstRoastSpecial ? "Processing..." : "Buy First Roast 12 for $0.99"}
-              </button>
-              <button
-                onClick={() => setShowFirstRoastDeal(false)}
-                className="flex-1 min-h-[48px] bg-zinc-800 active:bg-zinc-700 py-3 rounded-2xl text-sm transition-colors touch-manipulation"
-              >
-                Maybe later
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3 Roast Commit Deal Pop-up (after generating 3 roasts / hitting free limit) */}
-      {showThreeRoastDeal && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[65] p-4">
-          <div className="bg-zinc-900 rounded-3xl max-w-md w-full p-6 text-center">
-            <div className="text-4xl mb-3">💥</div>
-            <h2 className="text-2xl font-bold mb-2">You've got the hang of this.</h2>
-            <p className="text-zinc-400 mb-4">
-              Commit now and get a better deal than the regular packs:
-            </p>
-
-            <div className="bg-zinc-950 border-2 border-emerald-600 rounded-2xl p-5 mb-6">
-              <div className="text-3xl font-bold">$0.99</div>
-              <div className="text-xl">10 Roasts</div>
-              <div className="text-xs text-emerald-400 mt-2">Third Roast 10 for $0.99 — One-time bonus offer</div>
-            </div>
-
-            <p className="text-xs text-zinc-500 mb-5">
-              Commit after hitting your 3 free roasts and get this bonus pack. (Regular packs also still available.)
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => {
-                  setShowThreeRoastDeal(false);
-                  handleCheckout(STRIPE_PRICES.threeRoastSpecial);
-                }}
-                disabled={isCheckingOut !== null}
-                className="flex-1 min-h-[48px] bg-emerald-600 active:bg-emerald-500 text-white py-3 rounded-2xl font-semibold text-sm transition-colors touch-manipulation disabled:opacity-60"
-              >
-                {isCheckingOut === STRIPE_PRICES.threeRoastSpecial ? "Processing..." : "Buy Third Roast 10 for $0.99"}
-              </button>
-              <button
-                onClick={() => setShowThreeRoastDeal(false)}
-                className="flex-1 min-h-[48px] bg-zinc-800 active:bg-zinc-700 py-3 rounded-2xl text-sm transition-colors touch-manipulation"
-              >
-                Maybe later
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Special milestone modals removed — replaced with tasteful inline upsells after roasts.
+         Clean experience first. Users discover value naturally. */}
 
       {/* Upgrade / Pay Modal - pushes payment options exactly when user hits the free (or daily) limit */}
       {showUpgradeModal && (

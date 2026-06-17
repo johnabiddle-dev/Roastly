@@ -89,34 +89,43 @@ export async function generateRoastCardImage(
   const sy = 0;
   ctx.drawImage(img, sx, sy, img.width, img.height, photoX + borderWidth, photoY + borderWidth, photoWidth, photoHeight);
 
-  // Roast text area
-  const textStartY = photoY + photoHeight + borderWidth * 2 + 80;
-  const maxTextWidth = CARD_WIDTH - 160;
-  const fontSize = 52;
-  ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+  // Roast text area — respect explicit \n from model + smart wrap
+  const textStartY = photoY + photoHeight + borderWidth * 2 + 72;
+  const maxTextWidth = CARD_WIDTH - 140;
+  const fontSize = 50;
+  ctx.font = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
 
-  // Simple text wrapping
-  const words = roastText.split(' ');
+  // Split on explicit newlines first (model often returns "line1\\nline2")
+  const rawLines = roastText.split(/\n|\\n/);
   const lines: string[] = [];
-  let currentLine = '';
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxTextWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
+  for (const raw of rawLines) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    // Word wrap each segment
+    const words = trimmed.split(/\s+/);
+    let currentLine = '';
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxTextWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
     }
+    if (currentLine) lines.push(currentLine);
   }
-  if (currentLine) lines.push(currentLine);
+
+  // Limit to 4 lines visually for card beauty
+  const displayLines = lines.slice(0, 4);
 
   let y = textStartY;
-  const lineHeight = fontSize * 1.35;
-  for (const line of lines) {
+  const lineHeight = fontSize * 1.38;
+  for (const line of displayLines) {
     ctx.fillText(line, CARD_WIDTH / 2, y);
     y += lineHeight;
   }
@@ -138,53 +147,31 @@ export async function generateRoastCardImage(
   ctx.shadowBlur = 0;
   ctx.shadowColor = 'transparent';
 
-  // Branded CTA at the very bottom of the exported PNG (baked into every shareable card).
-  // Red Roasty icon (R badge) + strong call-to-action to drive more users.
-  // The domain is shown smaller below so the link is buried for promotion.
-  const ctaY = CARD_HEIGHT - 58;
-  const domainY = CARD_HEIGHT - 36;
-  const ctaText = 'roast your friends too';
-  const domainText = SITE_URL.replace('https://', '');
+  // Branded CTA baked into every card for organic virality.
+  // Strong, clean, non-spammy — encourages tagging friends + going to site.
+  const ctaY = CARD_HEIGHT - 62;
+  const domainY = CARD_HEIGHT - 38;
+  const ctaText = 'roast anything • roastly-app.vercel.app';
+  const domainText = 'roastly-app.vercel.app';
 
-  ctx.font = '400 22px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#4b5563';
-  const textW = ctx.measureText(ctaText).width;
   const cx = CARD_WIDTH / 2;
-  const iconR = 8;
-  const iconX = cx - textW / 2 - iconR - 8;
 
-  // Red Roasty badge icon (next to CTA)
+  // Subtle red dot accent
   ctx.fillStyle = '#ef4444';
   ctx.beginPath();
-  ctx.arc(iconX, ctaY - 1, iconR, 0, Math.PI * 2);
+  ctx.arc(cx - 138, ctaY - 1, 5, 0, Math.PI * 2);
   ctx.fill();
 
-  // White R inside icon
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('R', iconX, ctaY + 3);
-
-  // CTA text
-  ctx.font = '400 22px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#4b5563';
+  // Main CTA line
+  ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#6b7280';
   ctx.textAlign = 'center';
   ctx.fillText(ctaText, cx, ctaY);
 
-  // Domain (smaller, for discoverability when shared)
-  ctx.font = '400 16px system-ui, -apple-system, sans-serif';
+  // Domain (clear, tappable-looking when shared on stories/X)
+  ctx.font = '500 15px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#4b5563';
-  ctx.textAlign = 'center';
   ctx.fillText(domainText, cx, domainY);
-
-  // Subtle underline to hint that the domain is a link (even though it's a static PNG)
-  const domainW = ctx.measureText(domainText).width;
-  ctx.strokeStyle = '#4b5563';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(cx - domainW / 2, domainY + 4);
-  ctx.lineTo(cx + domainW / 2, domainY + 4);
-  ctx.stroke();
 
   return canvas.toDataURL('image/png', 0.95);
 }

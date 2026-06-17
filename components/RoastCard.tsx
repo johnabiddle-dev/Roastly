@@ -26,10 +26,8 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     if (!cardRef.current) return;
 
     try {
-      // Generate via canvas for reliable photo inclusion (fixes mobile capture issues)
       const dataUrl = await generateCardImage();
 
-      // Convert to File for share API
       const arr = dataUrl.split(',');
       const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
       const bstr = atob(arr[1]);
@@ -40,13 +38,9 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
       }
       const file = new File([u8arr], 'roasted.png', { type: mime });
 
-      // Only send a short CTA + link in the share text.
-      // The roast itself is already visually in the image (the card).
-      // This prevents the share sheet from creating a duplicate "regular text message"
-      // that repeats the roast text.
-      const shareText = `Saucy Grok just roasted my screenshot with the meanest Crispy roast 😂🔥\n\nUpload any photo, convo, meme — get 5 options and a shareable card. Free to try:\n${SITE_URL}\n\nFollow @roastlyapp — daily throat-rippers. Tag someone who needs this. #Roastly #Grok #AI`;
+      // Short, clean share text (roast lives in the beautiful image)
+      const shareText = `Saucy Grok just destroyed this 😂🔥\n\nRoast anything — screenshots, photos, texts, memes.\n${SITE_URL}\n\n#Roastly #Grok #AI`;
 
-      // Prefer native share sheet on mobile (Save to Photos is easy)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
@@ -59,14 +53,11 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
         link.href = dataUrl;
         link.click();
 
-        // On desktop / when share sheet isn't available, also copy the real link
-        // so the user can paste it somewhere (the image itself is just pixels).
         try {
           await navigator.clipboard.writeText(SITE_URL);
-          alert('Image downloaded as roasted.png.\n\nThe link was also copied to your clipboard:\n' + SITE_URL);
+          alert('Card downloaded as roasted.png.\nLink copied too — send it with the image.');
         } catch {
-          // Clipboard may be blocked; still let them know the link
-          alert('Image downloaded as roasted.png.\n\nVisit ' + SITE_URL + ' to roast back.');
+          alert('Card downloaded as roasted.png.\n' + SITE_URL);
         }
       }
     } catch (error: unknown) {
@@ -78,22 +69,29 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     }
   };
 
+  // Best-in-class pre-filled caption for X, IG Stories, TikTok, group chats.
+  // Includes the actual roast text (short) + natural hook + branding + hashtags.
+  const copyPerfectCaption = async () => {
+    const shortRoast = roastText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180);
+    const caption = `${shortRoast}\n\nRoasted by Saucy Grok 🔥\nRoast anything — photos, texts, X posts, memes.\n${SITE_URL}\n\nTag who needs this 👀\n#Roastly #Grok #AI #Roast`;
+    try {
+      await navigator.clipboard.writeText(caption);
+      alert('Perfect share caption copied!\nPaste + attach your downloaded card image on X, IG, or wherever.');
+    } catch {
+      window.prompt('Copy this caption:', caption);
+    }
+  };
+
   const handleSubmitToBrand = () => {
-    // Pre-fill a post with the roast text + strong CTA + link.
-    // User attaches the downloaded card PNG (their photo + the roast baked in).
-    // This is the easiest way for users to "send" the picture they created to @roastlyapp
-    // so the owner sees it and can repost/engage for more X reach.
-    const tweetText = `${roastText}\n\nRoasted (or uplifted) by Saucy Grok 🔥 Try it yourself:\n${SITE_URL}\n\n#Roastly #Grok #AI`;
+    // Users download the beautiful card then post to X tagging @roastlyapp.
+    // This fuels organic content + possible reposts.
+    const tweetText = `${roastText}\n\nRoasted by Saucy Grok 🔥\n${SITE_URL}\n\n#Roastly #Grok #AI`;
 
     navigator.clipboard.writeText(roastText).catch(() => {});
     window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank');
 
     alert(
-      'Roast text copied to clipboard!\n\n' +
-      '1. Make sure you downloaded the card image (the big PNG with your photo + this text).\n' +
-      '2. In the X composer that just opened, attach the PNG you downloaded.\n' +
-      '3. Post it (tag @roastlyapp if you want the owner to see and possibly repost it).\n\n' +
-      'Thanks — this is the easiest way for the app to get your created pictures in front of us for X content!'
+      'Roast copied.\n\nDownload the card PNG first, then attach it in the X post that opened.\nTag @roastlyapp to get featured.'
     );
   };
 
@@ -146,41 +144,38 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
             onClick={handleDownload}
             className="flex-1 min-h-[48px] bg-red-600 active:bg-red-700 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
           >
-            Download Image
+            Download Card
+          </button>
+
+          <button
+            onClick={copyPerfectCaption}
+            className="flex-1 min-h-[48px] bg-emerald-600 active:bg-emerald-500 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+          >
+            Copy caption for X / IG
           </button>
 
           <button
             onClick={handleSubmitToBrand}
             className="flex-1 min-h-[48px] bg-zinc-700 active:bg-zinc-600 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
           >
-            Send card to @roastlyapp
+            Send to @roastlyapp
           </button>
-
-          {isOwner && onPostToX && (
-            <button
-              onClick={onPostToX}
-              className="flex-1 min-h-[48px] bg-zinc-700 active:bg-zinc-600 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
-            >
-              Post to X
-            </button>
-          )}
         </div>
 
-        {/* Separate easy way to get the live link (the text in the image is just pixels) */}
+        {/* Link hint */}
         <div className="bg-zinc-900 pb-4 sm:pb-5 text-center">
           <button
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(SITE_URL);
-                alert('Link copied to clipboard!\n' + SITE_URL);
+                alert('Link copied: ' + SITE_URL);
               } catch {
-                // Fallback for strict browsers
-                window.prompt('Copy this link:', SITE_URL);
+                window.prompt('Copy link:', SITE_URL);
               }
             }}
             className="text-xs text-zinc-400 hover:text-zinc-200 underline active:text-white min-h-[44px] px-2 touch-manipulation"
           >
-            Copy link to roast back
+            Copy roastly link
           </button>
         </div>
       </div>
