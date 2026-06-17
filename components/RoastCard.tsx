@@ -166,7 +166,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
               onClick={onPostToX}
               className="flex-1 min-h-[48px] bg-sky-600 active:bg-sky-500 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
             >
-              Post to X as @roastlyapp
+              Post to X @roastlyapp
             </button>
           )}
         </div>

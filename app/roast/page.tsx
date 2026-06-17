@@ -254,7 +254,7 @@ export default function RoastPage() {
     handleGetRoasted();
   };
 
-  // Post the current roast + the full branded card image to X as @roastlyapp (owner-only; requires the 4 X_ keys in Vercel)
+  // Post the current roast + the full branded card image directly to X as @roastlyapp
   const postToX = async (roastText: string) => {
     if (!previewUrl) {
       alert("No image available to post.");
@@ -262,9 +262,18 @@ export default function RoastPage() {
     }
 
     try {
-      // Generate the exact same styled card PNG used for downloads (image + baked roast + branding + CTA).
-      // This makes direct X posts from the app look like the premium shareable cards, not raw screenshots.
+      // Generate the exact same styled card PNG (photo + roast baked in + branding)
       const cardBase64 = await generateRoastCardImage(previewUrl, roastText, vibe === 'uplifting');
+
+      // Build a strong post caption:
+      // - The roast text itself is the main content (front and center)
+      // - Short CTA + domain to drive traffic
+      // - Hashtags for reach and discoverability on X
+      const postCaption = `${roastText.trim()}
+
+Roast anything with Grok → roastly-app.vercel.app
+
+#Roastly #Grok #AI #Roast`;
 
       const browserId = getOrCreateBrowserId();
       const res = await fetch("/api/post-to-x", {
@@ -274,7 +283,7 @@ export default function RoastPage() {
           "x-roastly-browser-id": browserId,
         },
         body: JSON.stringify({
-          text: roastText,
+          text: postCaption,
           imageBase64: cardBase64,
         }),
       });

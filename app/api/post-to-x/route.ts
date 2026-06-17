@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
 
-// Owner-only: posts text + (now) full branded card image to X as the brand account.
-// UI calls this from the roast card modal (visible only to owner via usage.remaining hack).
+// Owner-only: posts the roast + full branded card image directly to X as @roastlyapp.
+// The client sends a complete caption containing the roast text + CTA + hashtags.
+// UI button "Post to X @roastlyapp" is shown only to the owner inside the card modal.
 
 export const runtime = 'nodejs';
 
@@ -27,8 +28,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
 
-    // Note: we append tags below, so final may exceed; we truncate defensively here.
-    // (Client check is on raw roast; card posts use visual text so caption can be shorter.)
+    // Client now sends a complete ready-to-post caption (roast + CTA + hashtags).
+    // We still enforce X's 280 char limit.
     if (text.length > 280) {
       return NextResponse.json({ error: "Text too long for X" }, { status: 400 });
     }
@@ -70,14 +71,11 @@ export async function POST(req: NextRequest) {
       mediaId = media;
     }
 
-    const tags = " #Roastly #Grok #AI";
-    let tweetText = (text.trim() + tags).trim();
+    // Use the text exactly as provided by the client (includes the roast text,
+    // CTA, and hashtags for visibility). Add a safety net for length.
+    let tweetText = text.trim();
     if (tweetText.length > 280) {
-      // Truncate the roast portion (visual card has the full text anyway)
-      const tagsLen = tags.length;
-      const maxForText = 280 - tagsLen;
-      const truncated = text.trim().slice(0, Math.max(1, maxForText - 3)) + "...";
-      tweetText = (truncated + tags).trim();
+      tweetText = tweetText.slice(0, 277) + "...";
     }
     const tweetOptions: any = { text: tweetText };
     if (mediaId) {
