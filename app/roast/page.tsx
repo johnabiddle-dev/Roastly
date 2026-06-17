@@ -35,8 +35,7 @@ export default function RoastPage() {
 
   // No public reset mechanisms for security. Owner uses OWNER_BROWSER_ID env var for unlimited access.
 
-  // Client-side persistence for free tier limit (so it survives serverless resets).
-  // The key includes USAGE_VERSION so bumping the version in lib/usage.ts globally resets free counters for all users.
+  // Client-side free limit tracking (survives serverless). Bumped via USAGE_VERSION to reset globally.
   const getClientFreeUsed = (browserId: string): number => {
     if (typeof window === "undefined") return 0;
     const key = `roastly-${USAGE_VERSION}-free-used-${browserId}`;
@@ -45,8 +44,7 @@ export default function RoastPage() {
 
   const setClientFreeUsed = (browserId: string, used: number) => {
     if (typeof window === "undefined") return;
-    const key = `roastly-${USAGE_VERSION}-free-used-${browserId}`;
-    localStorage.setItem(key, used.toString());
+    localStorage.setItem(`roastly-${USAGE_VERSION}-free-used-${browserId}`, String(used));
   };
 
   // Resize and convert image to JPEG base64 for reliable sending (especially from mobile/HEIC)
@@ -225,28 +223,13 @@ export default function RoastPage() {
     }
   };
 
-  // Helper to convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove the data:image/...;base64, prefix
-        const base64 = result.split(",")[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const resetUpload = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setRoasts([]);
-    setUsage(null);
     setError("");
     setCustomPrompt("");
+    // Note: usage refetch happens on next generate
   };
 
   const handleRegenerate = () => {
@@ -265,15 +248,11 @@ export default function RoastPage() {
       // Generate the exact same styled card PNG (photo + roast baked in + branding)
       const cardBase64 = await generateRoastCardImage(previewUrl, roastText, vibe === 'uplifting');
 
-      // Build a strong post caption:
-      // - The roast text itself is the main content (front and center)
-      // - Short CTA + domain to drive traffic
-      // - Hashtags for reach and discoverability on X
-      const postCaption = `${roastText.trim()}
-
-Roast anything with Grok → roastly-app.vercel.app
-
-#Roastly #Grok #AI #Roast`;
+      // Full caption for direct X post. Truncate safely to 280.
+      let postCaption = `${roastText.trim()}\n\nRoast anything → roastly-app.vercel.app\n\n#Roastly #Grok #AI #Roast`;
+      if (postCaption.length > 280) {
+        postCaption = postCaption.slice(0, 277) + "...";
+      }
 
       const browserId = getOrCreateBrowserId();
       const res = await fetch("/api/post-to-x", {
@@ -306,24 +285,30 @@ Roast anything with Grok → roastly-app.vercel.app
     }
   };
 
-  // For growth: personal referral link so users can bring friends (they get bonus free roasts, you get +5 when they pay)
   const copyReferralLink = () => {
     const id = getOrCreateBrowserId();
     const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
     navigator.clipboard.writeText(link);
-    alert("Your personal referral link copied!\n\nFriends who use it get extra free roasts.\nYou get +5 bonus roasts when they buy any pack.");
+    alert("Referral link copied. Friends get bonus roasts when they pay.");
   };
 
-  // Help users get traction on X with ready-to-post text (attach your downloaded card image)
   const copyViralXPost = () => {
     const id = getOrCreateBrowserId();
     const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-    const text = `Saucy Grok just roasted my screenshot with a disgusting banger 🔥\n\nWorks on anything: texts, X posts, photos, group chats.\nFree to try:\n${link}\n\nTag who needs it 👇 #Roastly #Grok #AI`;
+    const text = `Saucy Grok roasted this 🔥\n\nWorks on anything (screenshots, chats, photos).\n${link}\n\n#Roastly #Grok #AI`;
     navigator.clipboard.writeText(text);
-    alert("Viral X post text copied! Paste + attach the downloaded card image.");
+    alert("Viral text copied — paste + attach your card image.");
   };
 
   // Checkout handler (same pattern as landing page)
+  // Small helper to keep usage labels consistent and DRY
+  const getUsageLabel = () => {
+    if (!usage) return "Loading...";
+    if (usage.remaining > 100000) return "Unlimited (owner)";
+    if (usage.isPaid) return `${usage.remaining} roasts left today`;
+    return `${usage.remaining} free roasts remaining (3 total)`;
+  };
+
   const handleCheckout = async (priceId: string) => {
     if (!priceId) {
       alert("This product isn't set up yet.");
@@ -414,7 +399,7 @@ Roast anything with Grok → roastly-app.vercel.app
                       setSelectedRoastForCard(roast);
                       setShowCard(true);
                     }}
-                    className="bg-zinc-900 border border-zinc-800 hover:border-red-600 active:border-red-500 cursor-pointer rounded-2xl p-4 sm:p-5 text-base sm:text-lg min-h-[60px] transition-colors active:bg-zinc-800 touch-manipulation text-center"
+                    className="bg-zinc-900 border border-zinc-800 hover:border-red-600 active:border-red-500 cursor-pointer rounded-2xl p-4 sm:p-5 text-base sm:text-lg min-h-[60px] transition-colors active:bg-zinc-800 touch-manipulation text-center whitespace-pre-line"
                   >
                     {roast}
                   </div>
@@ -424,13 +409,7 @@ Roast anything with Grok → roastly-app.vercel.app
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4">
               <div className="text-xs sm:text-sm text-zinc-400 self-center text-center sm:text-left">
-                {usage 
-                  ? (usage.remaining > 100000 
-                      ? "Unlimited (owner)" 
-                      : usage.isPaid 
-                        ? `${usage.remaining} roasts left today` 
-                        : `${usage.remaining} free roasts remaining (3 total)`)
-                  : ""}
+                {getUsageLabel()}
               </div>
               <button
                 onClick={handleRegenerate}
@@ -472,19 +451,12 @@ Roast anything with Grok → roastly-app.vercel.app
               </div>
             )}
 
-            {/* Subtle referral encouragement - keeps UI clean, mobile friendly */}
-            <div className="mt-4 text-center">
-              <button
-                onClick={copyReferralLink}
-                className="text-emerald-400 hover:text-emerald-300 text-xs underline active:text-emerald-200 transition-colors mr-3"
-              >
-                Copy your referral link (friends get bonus roasts)
+            <div className="mt-4 text-center text-xs">
+              <button onClick={copyReferralLink} className="text-emerald-400 hover:text-emerald-300 underline active:text-emerald-200 mr-3">
+                Copy referral link
               </button>
-              <button
-                onClick={copyViralXPost}
-                className="text-emerald-400 hover:text-emerald-300 text-xs underline active:text-emerald-200 transition-colors"
-              >
-                Copy viral X post text (attach your card image)
+              <button onClick={copyViralXPost} className="text-emerald-400 hover:text-emerald-300 underline active:text-emerald-200">
+                Copy viral X text
               </button>
             </div>
 
@@ -628,11 +600,7 @@ Roast anything with Grok → roastly-app.vercel.app
                       : "Get Roasted →"}
                 </button>
                 <p className="text-xs text-zinc-500 mt-3">
-                  {usage 
-                    ? usage.isPaid 
-                      ? (usage.remaining > 100000 ? "Unlimited (owner)" : `${usage.remaining} roasts left today`) 
-                      : `${usage.remaining} free roasts remaining (3 total)`
-                    : "Loading limit..."}
+                  {getUsageLabel()}
                 </p>
 
                 {usage && usage.remaining <= 0 && (
@@ -663,10 +631,7 @@ Roast anything with Grok → roastly-app.vercel.app
         />
       )}
 
-      {/* Special milestone modals removed — replaced with tasteful inline upsells after roasts.
-         Clean experience first. Users discover value naturally. */}
-
-      {/* Upgrade / Pay Modal - pushes payment options exactly when user hits the free (or daily) limit */}
+      {/* Upgrade / Pay Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4">
           <div className="bg-zinc-900 rounded-3xl max-w-lg w-full p-6 text-center">

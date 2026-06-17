@@ -15,8 +15,6 @@ export async function generateRoastCardImage(
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('Could not get canvas context');
 
-  const SITE_URL = 'https://roastly-app.vercel.app';
-
   // Dark background (zinc-950)
   ctx.fillStyle = '#09090b';
   ctx.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);

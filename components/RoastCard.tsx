@@ -17,16 +17,11 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
 
   const SITE_URL = 'https://roastly-app.vercel.app';
 
-  // Use shared generator (ensures downloads and X posts always use identical branded card)
-  const generateCardImage = async (): Promise<string> => {
-    return generateRoastCardImage(imageUrl, roastText, isUplifting);
-  };
-
   const handleDownload = async () => {
     if (!cardRef.current) return;
 
     try {
-      const dataUrl = await generateCardImage();
+      const dataUrl = await generateRoastCardImage(imageUrl, roastText, isUplifting);
 
       const arr = dataUrl.split(',');
       const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
@@ -55,9 +50,9 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
 
         try {
           await navigator.clipboard.writeText(SITE_URL);
-          alert('Card downloaded as roasted.png.\nLink copied too — send it with the image.');
+          alert('Downloaded. Link also copied.');
         } catch {
-          alert('Card downloaded as roasted.png.\n' + SITE_URL);
+          alert('Card saved as roasted.png');
         }
       }
     } catch (error: unknown) {
@@ -76,7 +71,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     const caption = `${shortRoast}\n\nRoasted by Saucy Grok 🔥\nRoast anything — photos, texts, X posts, memes.\n${SITE_URL}\n\nTag who needs this 👀\n#Roastly #Grok #AI #Roast`;
     try {
       await navigator.clipboard.writeText(caption);
-      alert('Perfect share caption copied!\nPaste + attach your downloaded card image on X, IG, or wherever.');
+      alert('Caption copied! Paste it with the downloaded card image.');
     } catch {
       window.prompt('Copy this caption:', caption);
     }
@@ -90,25 +85,23 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     navigator.clipboard.writeText(roastText).catch(() => {});
     window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank');
 
-    alert(
-      'Roast copied.\n\nDownload the card PNG first, then attach it in the X post that opened.\nTag @roastlyapp to get featured.'
-    );
+    alert('Roast copied. Download the card PNG, attach it to the tweet composer that opened, and tag @roastlyapp.');
   };
 
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 rounded-3xl max-w-2xl w-full overflow-hidden">
-        {/* Card Preview */}
+        {/* Card Preview - tighter on mobile, closer match to exported card */}
         <div 
           ref={cardRef}
-          className="bg-zinc-950 p-8 flex flex-col items-center"
+          className="bg-zinc-950 p-5 sm:p-8 flex flex-col items-center"
           style={{ 
-            aspectRatio: '9/16', // Good for sharing in chats (portrait)
-            maxHeight: '70vh'
+            aspectRatio: '9/16',
+            maxHeight: '68vh'
           }}
         >
           {/* Photo */}
-          <div className={`w-full max-w-[320px] rounded-2xl overflow-hidden mb-6 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 25px rgba(16,185,129,0.35), 0 0 50px rgba(16,185,129,0.15)" } : {}}>
+          <div className={`w-full max-w-[300px] sm:max-w-[320px] rounded-2xl overflow-hidden mb-4 sm:mb-6 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 20px rgba(16,185,129,0.3)" } : {}}>
             <img 
               src={imageUrl} 
               alt="Roasted" 
@@ -116,47 +109,46 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
             />
           </div>
 
-          {/* Roast Text */}
-          <div className="text-center px-4">
-            <p className="text-white text-xl md:text-2xl font-semibold leading-tight tracking-tight">
+          {/* Roast Text - respects \n like the exported card */}
+          <div className="text-center px-3 whitespace-pre-line">
+            <p className="text-white text-[17px] sm:text-xl md:text-2xl font-semibold leading-tight tracking-tight">
               {roastText}
             </p>
           </div>
 
           {/* Branding */}
-          <div className="mt-auto pt-8 text-center">
-            <p className="text-xs text-zinc-500 tracking-[3px]">{isUplifting ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
-            <p className={`${isUplifting ? "text-emerald-500" : "text-red-500"} font-bold text-lg -mt-1`}>SAUCY GROK</p>
-            <p className="text-[10px] text-zinc-500 mt-1 tracking-normal">click here to roast back</p>
-            <p className="text-[9px] text-zinc-600 tracking-normal">roastly-app.vercel.app</p>
+          <div className="mt-auto pt-6 sm:pt-8 text-center">
+            <p className="text-[10px] text-zinc-500 tracking-[2px]">{isUplifting ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
+            <p className={`${isUplifting ? "text-emerald-500" : "text-red-500"} font-bold text-base sm:text-lg -mt-0.5`}>SAUCY GROK</p>
+            <p className="text-[9px] text-zinc-500 mt-0.5">roastly-app.vercel.app</p>
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="p-4 sm:p-6 flex flex-col sm:flex-row gap-3 sm:gap-4 bg-zinc-900">
+        {/* Controls - mobile optimized: 2-col grid on phones, row on larger */}
+        <div className="p-3 sm:p-4 grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3 bg-zinc-900">
           <button
             onClick={onClose}
-            className="flex-1 min-h-[48px] bg-zinc-800 active:bg-zinc-700 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+            className="min-h-[44px] bg-zinc-800 active:bg-zinc-700 text-white py-2.5 rounded-2xl font-semibold transition-colors text-sm touch-manipulation"
           >
             Close
           </button>
           <button
             onClick={handleDownload}
-            className="flex-1 min-h-[48px] bg-red-600 active:bg-red-700 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+            className="min-h-[44px] bg-red-600 active:bg-red-700 text-white py-2.5 rounded-2xl font-semibold transition-colors text-sm touch-manipulation"
           >
             Download Card
           </button>
 
           <button
             onClick={copyPerfectCaption}
-            className="flex-1 min-h-[48px] bg-emerald-600 active:bg-emerald-500 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+            className="min-h-[44px] bg-emerald-600 active:bg-emerald-500 text-white py-2.5 rounded-2xl font-semibold transition-colors text-sm touch-manipulation"
           >
-            Copy caption for X / IG
+            Copy caption
           </button>
 
           <button
             onClick={handleSubmitToBrand}
-            className="flex-1 min-h-[48px] bg-zinc-700 active:bg-zinc-600 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+            className="min-h-[44px] bg-zinc-700 active:bg-zinc-600 text-white py-2.5 rounded-2xl font-semibold transition-colors text-sm touch-manipulation"
           >
             Send to @roastlyapp
           </button>
@@ -164,7 +156,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           {isOwner && onPostToX && (
             <button
               onClick={onPostToX}
-              className="flex-1 min-h-[48px] bg-sky-600 active:bg-sky-500 text-white py-3 rounded-2xl font-semibold transition-colors text-sm sm:text-base"
+              className="col-span-2 sm:col-span-1 min-h-[44px] bg-sky-600 active:bg-sky-500 text-white py-2.5 rounded-2xl font-semibold transition-colors text-sm touch-manipulation"
             >
               Post to X @roastlyapp
             </button>

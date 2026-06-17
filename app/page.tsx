@@ -303,7 +303,7 @@ export default function RoastlyLanding() {
               const id = getOrCreateBrowserId();
               const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
               navigator.clipboard.writeText(link);
-              alert("Personal referral link copied! When friends roast and pay, you get +5 bonus roasts.");
+              alert("Referral link copied.");
             }}
             className="min-h-[44px] bg-emerald-600 active:bg-emerald-700 text-white text-xs sm:text-sm px-4 py-2 rounded-2xl transition-colors font-semibold touch-manipulation"
           >
@@ -313,16 +313,16 @@ export default function RoastlyLanding() {
             onClick={() => {
               const id = getOrCreateBrowserId();
               const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-              const text = `Saucy Grok just roasted my screenshot (or group chat) with a brutal banger 😂🔥\n\nWorks on literally anything. Free:\n${link}\n\nTag a friend. #Roastly #Grok #AI`;
+              const text = `Saucy Grok roasted this 🔥\n\nWorks on anything.\n${link}\n\n#Roastly #Grok #AI`;
               navigator.clipboard.writeText(text);
-              alert("Viral X post text copied! Paste + attach a roast card image.");
+              alert("X text copied.");
             }}
             className="min-h-[44px] bg-zinc-800 active:bg-zinc-700 text-white text-xs sm:text-sm px-4 py-2 rounded-2xl transition-colors font-semibold touch-manipulation"
           >
-            Copy X post text
+            Copy X text
           </button>
         </div>
-        <p className="text-[10px] sm:text-xs text-zinc-500 mt-2">Friends get extra free roasts.<br className="sm:hidden" /> You get +5 bonus when they buy.</p>
+        <p className="text-[10px] sm:text-xs text-zinc-500 mt-2">Friends get bonus roasts. You get +5 when they buy.</p>
       </div>
 
       {/* Legal footer */}
