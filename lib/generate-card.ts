@@ -29,10 +29,10 @@ export async function generateRoastCardImage(
   });
 
   // Photo area: centered, with border, similar to DOM
-  // Much larger photo so the user's image dominates the card (to match the nice preview proportions)
-  const photoMaxWidth = 820;
-  const photoMaxHeight = 860;
-  const borderWidth = 16;
+  // Even larger photo area so the uploaded photo takes up most of the card (to match the preview look users like)
+  const photoMaxWidth = 900;
+  const photoMaxHeight = 1050;
+  const borderWidth = 12;
 
   let photoWidth = img.width;
   let photoHeight = img.height;
@@ -50,7 +50,7 @@ export async function generateRoastCardImage(
   }
 
   const photoX = (CARD_WIDTH - photoWidth - borderWidth * 2) / 2;
-  const photoY = 40; // top padding for photo - larger photo area
+  const photoY = 30; // top padding for photo - larger photo area
 
   // Halo / glow for uplifting mode (soft positive aura around the photo)
   if (isUplifting) {
@@ -83,19 +83,46 @@ export async function generateRoastCardImage(
   ctx.fillStyle = isUplifting ? '#064e3b' : '#1f2937'; // darker for roast, deep emerald tint for uplift
   ctx.fillRect(photoX, photoY, photoWidth + borderWidth * 2, photoHeight + borderWidth * 2);
 
-  // Draw the photo (cover)
-  const sx = 0;
-  const sy = 0;
-  ctx.drawImage(img, sx, sy, img.width, img.height, photoX + borderWidth, photoY + borderWidth, photoWidth, photoHeight);
+  // Draw the photo using "cover" style (fill the box, crop if needed) to match the preview look
+  const destWidth = photoWidth;
+  const destHeight = photoHeight;
+  const destX = photoX + borderWidth;
+  const destY = photoY + borderWidth;
+
+  // Calculate source rect to cover the destination exactly (like object-cover)
+  const imgAspect = img.width / img.height;
+  const destAspect = destWidth / destHeight;
+
+  let sourceX, sourceY, sourceWidth, sourceHeight;
+
+  if (imgAspect > destAspect) {
+    // Image is wider than box - crop sides
+    sourceHeight = img.height;
+    sourceWidth = sourceHeight * destAspect;
+    sourceX = (img.width - sourceWidth) / 2;
+    sourceY = 0;
+  } else {
+    // Image is taller than box - crop top/bottom
+    sourceWidth = img.width;
+    sourceHeight = sourceWidth / destAspect;
+    sourceX = 0;
+    sourceY = (img.height - sourceHeight) / 2;
+  }
+
+  ctx.drawImage(
+    img,
+    sourceX, sourceY, sourceWidth, sourceHeight,
+    destX, destY, destWidth, destHeight
+  );
 
   // Roast text area — dynamic font size + centering so the COMPLETE roast text always fits and shows (no cut off)
-  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 15;
-  const textAreaBottom = CARD_HEIGHT - 95; // stop text before branding
-  const maxAvailableHeight = Math.max(220, textAreaBottom - textAreaTop);
+  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 10;
+  const textAreaBottom = CARD_HEIGHT - 75; // stop text before branding
+  const maxAvailableHeight = Math.max(180, textAreaBottom - textAreaTop);
   const maxTextWidth = CARD_WIDTH - 140;
 
-  let fontSize = 42;
-  let lineHeight = fontSize * 1.38;
+  let fontSize = 36;
+  let lineHeight = fontSize * 1.32;
   let lines: string[] = [];
 
   const wrapText = (text: string, font: string, maxW: number) => {

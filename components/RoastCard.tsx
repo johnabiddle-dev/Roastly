@@ -99,7 +99,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           }}
         >
           {/* Photo */}
-          <div className={`w-full max-w-[380px] sm:max-w-[420px] rounded-2xl overflow-hidden mb-4 sm:mb-6 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 20px rgba(16,185,129,0.3)" } : {}}>
+          <div className={`w-full max-w-[480px] sm:max-w-[520px] rounded-2xl overflow-hidden mb-2 sm:mb-4 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 20px rgba(16,185,129,0.3)" } : {}}>
             <img 
               src={imageUrl} 
               alt="Roasted" 
@@ -108,14 +108,14 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           </div>
 
           {/* Roast Text - respects \n like the exported card */}
-          <div className="text-center px-3 whitespace-pre-line">
+          <div className="text-center px-2 whitespace-pre-line">
             <p className="text-white text-[17px] sm:text-xl md:text-2xl font-semibold leading-tight tracking-tight">
               {roastText}
             </p>
           </div>
 
           {/* Branding */}
-          <div className="mt-auto pt-6 sm:pt-8 text-center">
+          <div className="mt-auto pt-3 sm:pt-5 text-center">
             <p className="text-[10px] text-zinc-500 tracking-[2px]">{isUplifting ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
             <p className={`${isUplifting ? "text-emerald-500" : "text-red-500"} font-bold text-base sm:text-lg -mt-0.5`}>SAUCY GROK</p>
             <p className="text-[9px] text-zinc-500 mt-0.5">roastly-app.vercel.app</p>
