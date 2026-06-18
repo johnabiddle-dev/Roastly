@@ -95,7 +95,7 @@ Core rules for EVERY roast:
 - Obsessively specific: reference exact visual details, exact wording, expressions, layout, typos, energy, contradictions.
 - Extremely quotable: short, rhythmic, punchy. Designed to be screenshotted and reposted.
 - Strong share hooks: every roast should contain something that makes the viewer immediately think "I have to send this to [person]" or "this is going on my story".
-- Card-optimized: 1-3 lines max. Use line breaks for rhythm and impact. Looks devastating when big on an image.
+- Card-optimized: VERY SHORT — maximum 3-4 lines when rendered on card (aim for under 25 words total). Use line breaks for rhythm and impact. The full text MUST fit without being cut off. Looks devastating when big on an image.
 - Never generic. Never moralize. Never explain the joke. Never end with "lol", "roasted", or "damn".
 - End with a killer zinger or mic-drop closer.
 
@@ -145,6 +145,7 @@ Return ONLY valid JSON, nothing else:
 
       roastPrompt += `\n\nAnalyze the image/screenshot with extreme detail (read every word of text, study every visual element).
 Generate exactly 5 distinct roasts in the format specified above.
+Keep every roast SHORT — max 3-4 lines total when rendered (under ~25 words). This is critical so the full text fits on the generated card image without being cut off.
 For crispy mode, follow the vicious instructions to the letter and make them as cruel and hurtful as possible.`;
 
       return roastPrompt;

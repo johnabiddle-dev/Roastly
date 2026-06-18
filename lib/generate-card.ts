@@ -30,7 +30,7 @@ export async function generateRoastCardImage(
 
   // Photo area: centered, with border, similar to DOM
   const photoMaxWidth = 700;
-  const photoMaxHeight = 700;
+  const photoMaxHeight = 640; // slightly smaller to give more room for longer roast text
   const borderWidth = 24;
 
   let photoWidth = img.width;
@@ -87,43 +87,67 @@ export async function generateRoastCardImage(
   const sy = 0;
   ctx.drawImage(img, sx, sy, img.width, img.height, photoX + borderWidth, photoY + borderWidth, photoWidth, photoHeight);
 
-  // Roast text area — respect explicit \n from model + smart wrap
-  const textStartY = photoY + photoHeight + borderWidth * 2 + 72;
+  // Roast text area — dynamic font size + centering so the COMPLETE roast text always fits and shows (no cut off)
+  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 55;
+  const textAreaBottom = CARD_HEIGHT - 175; // reserve space for branding
+  const maxAvailableHeight = Math.max(200, textAreaBottom - textAreaTop);
   const maxTextWidth = CARD_WIDTH - 140;
-  const fontSize = 50;
-  ctx.font = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
 
-  // Split on explicit newlines first (model often returns "line1\\nline2")
-  const rawLines = roastText.split(/\n|\\n/);
-  const lines: string[] = [];
+  let fontSize = 50;
+  let lineHeight = fontSize * 1.38;
+  let lines: string[] = [];
 
-  for (const raw of rawLines) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    // Word wrap each segment
-    const words = trimmed.split(/\s+/);
-    let currentLine = '';
-    for (const word of words) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word;
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxTextWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = testLine;
+  const wrapText = (text: string, font: string, maxW: number) => {
+    ctx.font = font;
+    const rawLines = text.split(/\n|\\n/);
+    const result: string[] = [];
+    for (const raw of rawLines) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const words = trimmed.split(/\s+/);
+      let currentLine = '';
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (ctx.measureText(testLine).width > maxW && currentLine) {
+          result.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
       }
+      if (currentLine) result.push(currentLine);
     }
-    if (currentLine) lines.push(currentLine);
+    return result;
+  };
+
+  // Reduce font size until text fits in available vertical space (min 34px)
+  while (fontSize >= 34) {
+    const testFont = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    lines = wrapText(roastText, testFont, maxTextWidth);
+    lineHeight = fontSize * 1.38;
+    const needed = lines.length * lineHeight;
+    if (needed <= maxAvailableHeight) break;
+    fontSize -= 4;
   }
 
-  // Limit to 4 lines visually for card beauty
-  const displayLines = lines.slice(0, 4);
+  // Final safety: if still too many lines, truncate (very rare)
+  const maxLines = Math.floor(maxAvailableHeight / lineHeight);
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    if (lines.length > 0) {
+      lines[lines.length - 1] = lines[lines.length - 1].replace(/...$/, '') + '...';
+    }
+  }
 
-  let y = textStartY;
-  const lineHeight = fontSize * 1.38;
-  for (const line of displayLines) {
+  // Center the entire text block vertically in the available space
+  const totalHeight = lines.length * lineHeight;
+  let y = textAreaTop + (maxAvailableHeight - totalHeight) / 2;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.font = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+
+  for (const line of lines) {
     ctx.fillText(line, CARD_WIDTH / 2, y);
     y += lineHeight;
   }
