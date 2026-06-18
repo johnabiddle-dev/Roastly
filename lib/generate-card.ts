@@ -29,8 +29,9 @@ export async function generateRoastCardImage(
   });
 
   // Photo area: centered, with border, similar to DOM
-  const photoMaxWidth = 700;
-  const photoMaxHeight = 640; // slightly smaller to give more room for longer roast text
+  // Reduced photo size to give significantly more vertical room for the roast text below it
+  const photoMaxWidth = 660;
+  const photoMaxHeight = 520;
   const borderWidth = 24;
 
   let photoWidth = img.width;
@@ -49,7 +50,7 @@ export async function generateRoastCardImage(
   }
 
   const photoX = (CARD_WIDTH - photoWidth - borderWidth * 2) / 2;
-  const photoY = 140;
+  const photoY = 80; // moved up for more text space below photo
 
   // Halo / glow for uplifting mode (soft positive aura around the photo)
   if (isUplifting) {
@@ -88,9 +89,9 @@ export async function generateRoastCardImage(
   ctx.drawImage(img, sx, sy, img.width, img.height, photoX + borderWidth, photoY + borderWidth, photoWidth, photoHeight);
 
   // Roast text area — dynamic font size + centering so the COMPLETE roast text always fits and shows (no cut off)
-  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 55;
-  const textAreaBottom = CARD_HEIGHT - 175; // reserve space for branding
-  const maxAvailableHeight = Math.max(200, textAreaBottom - textAreaTop);
+  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 40;
+  const textAreaBottom = CARD_HEIGHT - 155; // stop text before branding
+  const maxAvailableHeight = Math.max(250, textAreaBottom - textAreaTop);
   const maxTextWidth = CARD_WIDTH - 140;
 
   let fontSize = 50;
@@ -108,7 +109,7 @@ export async function generateRoastCardImage(
       let currentLine = '';
       for (const word of words) {
         const testLine = currentLine ? `${currentLine} ${word}` : word;
-        if (ctx.measureText(testLine).width > maxW && currentLine) {
+        if (ctx.measureText(testLine).width > maxW * 0.98 && currentLine) {
           result.push(currentLine);
           currentLine = word;
         } else {
@@ -120,8 +121,8 @@ export async function generateRoastCardImage(
     return result;
   };
 
-  // Reduce font size until text fits in available vertical space (min 34px)
-  while (fontSize >= 34) {
+  // Reduce font size until text fits in available vertical space (min 28px)
+  while (fontSize >= 28) {
     const testFont = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
     lines = wrapText(roastText, testFont, maxTextWidth);
     lineHeight = fontSize * 1.38;
@@ -130,17 +131,15 @@ export async function generateRoastCardImage(
     fontSize -= 4;
   }
 
-  // Final safety: if still too many lines, truncate (very rare)
-  const maxLines = Math.floor(maxAvailableHeight / lineHeight);
-  if (lines.length > maxLines) {
-    lines = lines.slice(0, maxLines);
-    if (lines.length > 0) {
-      lines[lines.length - 1] = lines[lines.length - 1].replace(/...$/, '') + '...';
-    }
+  // If still too tall even at min font, use tighter line spacing instead of dropping text
+  let effectiveLineHeight = lineHeight;
+  const neededHeight = lines.length * lineHeight;
+  if (neededHeight > maxAvailableHeight) {
+    effectiveLineHeight = maxAvailableHeight / lines.length;
   }
 
   // Center the entire text block vertically in the available space
-  const totalHeight = lines.length * lineHeight;
+  const totalHeight = lines.length * effectiveLineHeight;
   let y = textAreaTop + (maxAvailableHeight - totalHeight) / 2;
 
   ctx.fillStyle = '#ffffff';
@@ -149,15 +148,15 @@ export async function generateRoastCardImage(
 
   for (const line of lines) {
     ctx.fillText(line, CARD_WIDTH / 2, y);
-    y += lineHeight;
+    y += effectiveLineHeight;
   }
 
-  // Branding at bottom
-  ctx.font = '600 28px system-ui, -apple-system, sans-serif';
+  // Branding at bottom (compressed to give more room to the roast text above)
+  ctx.font = '600 26px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#6b7280'; // zinc-500
-  ctx.fillText(isUplifting ? 'UPLIFTED BY' : 'ROASTED BY', CARD_WIDTH / 2, CARD_HEIGHT - 160);
+  ctx.fillText(isUplifting ? 'UPLIFTED BY' : 'ROASTED BY', CARD_WIDTH / 2, CARD_HEIGHT - 145);
 
-  ctx.font = `bold 52px system-ui, -apple-system, sans-serif`;
+  ctx.font = `bold 48px system-ui, -apple-system, sans-serif`;
   ctx.fillStyle = isUplifting ? '#10b981' : '#ef4444'; // emerald or red
   if (isUplifting) {
     ctx.shadowColor = '#10b981';
@@ -165,14 +164,14 @@ export async function generateRoastCardImage(
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
   }
-  ctx.fillText('SAUCY GROK', CARD_WIDTH / 2, CARD_HEIGHT - 100);
+  ctx.fillText('SAUCY GROK', CARD_WIDTH / 2, CARD_HEIGHT - 95);
   ctx.shadowBlur = 0;
   ctx.shadowColor = 'transparent';
 
   // Branded CTA baked into every card for organic virality.
   // Strong, clean, non-spammy — encourages tagging friends + going to site.
-  const ctaY = CARD_HEIGHT - 62;
-  const domainY = CARD_HEIGHT - 38;
+  const ctaY = CARD_HEIGHT - 55;
+  const domainY = CARD_HEIGHT - 35;
   const ctaText = 'roast anything • roastly-app.vercel.app';
   const domainText = 'roastly-app.vercel.app';
 
