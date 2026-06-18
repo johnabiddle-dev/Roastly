@@ -99,7 +99,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
           }}
         >
           {/* Photo */}
-          <div className={`w-full max-w-[300px] sm:max-w-[320px] rounded-2xl overflow-hidden mb-4 sm:mb-6 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 20px rgba(16,185,129,0.3)" } : {}}>
+          <div className={`w-full max-w-[340px] sm:max-w-[380px] rounded-2xl overflow-hidden mb-4 sm:mb-6 border-4 ${isUplifting ? "border-emerald-600" : "border-zinc-800"}`} style={isUplifting ? { boxShadow: "0 0 20px rgba(16,185,129,0.3)" } : {}}>
             <img 
               src={imageUrl} 
               alt="Roasted" 
