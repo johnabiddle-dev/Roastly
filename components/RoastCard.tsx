@@ -64,28 +64,26 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
     }
   };
 
-  // Best-in-class pre-filled caption for X, IG Stories, TikTok, group chats.
-  // Includes the actual roast text (short) + natural hook + branding + hashtags.
+  // Viral-optimized caption for X. Includes the roast + strong hooks + hashtags.
   const copyPerfectCaption = async () => {
-    const shortRoast = roastText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180);
-    const caption = `${shortRoast}\n\nRoasted by Saucy Grok 🔥\nRoast anything — photos, texts, X posts, memes.\n${SITE_URL}\n\nTag who needs this 👀\n#Roastly #Grok #AI #Roast`;
+    const shortRoast = roastText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const caption = `${shortRoast}\n\nRoasted by Saucy Grok 🔥\nRoast anything (screenshots, photos, convos, anything).\n${SITE_URL}\n\nTag someone who needs this 👀 #Roastly #Grok #AI #Roast`;
     try {
       await navigator.clipboard.writeText(caption);
-      alert('Caption copied! Paste it with the downloaded card image.');
+      alert('Caption copied! Paste + attach the card image on X.');
     } catch {
       window.prompt('Copy this caption:', caption);
     }
   };
 
   const handleSubmitToBrand = () => {
-    // Users download the beautiful card then post to X tagging @roastlyapp.
-    // This fuels organic content + possible reposts.
-    const tweetText = `${roastText}\n\nRoasted by Saucy Grok 🔥\n${SITE_URL}\n\n#Roastly #Grok #AI`;
+    // Pre-fills a strong X post. User attaches the downloaded card image.
+    const tweetText = `${roastText}\n\nRoasted by Saucy Grok 🔥\n${SITE_URL}\n\n#Roastly #Grok #AI #Roast`;
 
     navigator.clipboard.writeText(roastText).catch(() => {});
     window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank');
 
-    alert('Roast copied. Download the card PNG, attach it to the tweet composer that opened, and tag @roastlyapp.');
+    alert('Roast copied. Attach the downloaded card image and tag @roastlyapp if you want it featured.');
   };
 
   return (

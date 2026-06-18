@@ -248,8 +248,9 @@ export default function RoastPage() {
       // Generate the exact same styled card PNG (photo + roast baked in + branding)
       const cardBase64 = await generateRoastCardImage(previewUrl, roastText, vibe === 'uplifting');
 
-      // Full caption for direct X post. Truncate safely to 280.
-      let postCaption = `${roastText.trim()}\n\nRoast anything → roastly-app.vercel.app\n\n#Roastly #Grok #AI #Roast`;
+      // High-virality caption for direct brand post on X.
+      // Roast text first (the star), then hook + hashtags.
+      let postCaption = `${roastText.trim()}\n\nRoast anything with Grok → roastly-app.vercel.app\n\n#Roastly #Grok #AI #Roast`;
       if (postCaption.length > 280) {
         postCaption = postCaption.slice(0, 277) + "...";
       }
@@ -385,13 +386,13 @@ export default function RoastPage() {
                 {vibe === 'uplifting' 
                   ? 'Saucy Grok says something nice...' 
                   : vibe === 'crispy' 
-                    ? 'Your Crispy roasts' 
+                    ? 'Your Crispy roasts (nuclear edition)' 
                     : vibe === 'medium_rare' 
                       ? 'Your Medium Rare roasts' 
                       : 'Your Light Toast roasts'}
               </h2>
               <div className="space-y-4">
-                <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast to build the beautiful shareable card. 5 options. Works on screenshots, chats, photos — anything.</p>
+                <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast to create the card. These are built for X — post them.</p>
                 {roasts.map((roast, index) => (
                   <div 
                     key={index} 

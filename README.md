@@ -49,7 +49,7 @@ Owner unlimited access:
 3. In your browser console on the site: `localStorage.setItem('roastly-browser-id', 'THE-EXACT-UUID')`
 This gives you (and only you) permanent unlimited roasts + custom prompts. No public backdoors.
 
-**CRITICAL SECURITY NOTE:** The OWNER_BROWSER_ID is the master key for the entire site (unlimited roasts, custom prompts, direct posting as @roastlyapp on X, dev-chat control, etc.). Treat it like a high-value password:
+**CRITICAL SECURITY NOTE:** The OWNER_BROWSER_ID is the master key for the entire site (unlimited roasts, custom prompts, direct posting as @roastlyapp on X, etc.). Treat it like a high-value password:
 - Never commit it.
 - Never share the value.
 - Set it only on devices you fully control.
@@ -138,12 +138,11 @@ What you need (in this order):
 
 6. After all four are saved, go to Deployments tab → Redeploy the latest deployment.
 
-Once redeployed (after adding the 4 X_ keys), owner-only "Post to X" button appears inside the shareable card modal (after you tap a roast result to open the card and pick your favorite). It posts the selected roast text + the original photo directly from @roastlyapp and returns the link.
+Once redeployed (after adding the 4 X_ keys), owner-only "Post to X @roastlyapp" button appears inside the shareable card modal (after you tap a roast result to open the card and pick your favorite). It posts the selected roast text + the full branded card image directly from @roastlyapp and returns the link.
 
 (The OAuth 2.0 Client ID/Secret are not used; only the four OAuth 1.0a keys from the Consumer + Access Token sections.)
 
-You can also trigger posts from the /dev-chat phone interface with instructions like:
-"post on X as @roastlyapp: Here is a savage roast of this vibe... [or ask me to generate a full thread using the promo images]"
+For posting from phone or remote: use the in-app "Post to X @roastlyapp" button (owner only). For other instructions/changes, provide them directly in this AI chat session.
 
 ## Environment Variables (for local)
 
@@ -171,43 +170,9 @@ This app was originally built in collaboration, but per the owner's request, **R
 
 ## Contact / Feedback
 
-## Dev / Phone ↔ Computer Bridge
+---
 
-There is a private owner-only live instruction channel for continuing work / making tweaks from phone (while on the road, etc.).
-
-URL: https://roastly-app.vercel.app/dev-chat (gated by OWNER_BROWSER_ID UUID — same as unlimited access).
-
-**How it works for execution:**
-- Send messages/instructions from phone (e.g. "update the roast prompt to [new text]", "add a share to X button", "change the free limit to 5", "deploy", or "post on X as @roastlyapp: generate a thread promoting the app").
-- I have a live monitor polling the API. New messages trigger me to execute the requested changes (edits, builds, deploys, etc.) using my tools.
-- The page shows a live-updating list of sent messages.
-- Use the bottom draft area for notes; the main input is for actionable instructions.
-- Shareable link for syncing state between your devices.
-
-It is fully owner-gated (401 for others). No public exposure. Messages go through the secure /api/dev-chat (owner header required). No impact on main app.
-
-**Security:** The dev-chat gives the AI (me) the ability to make code changes, run deploys, and post to X as the brand. Only you should ever have the owner ID. If compromised, an attacker could instruct changes or post spam as @roastlyapp.
-
-This lets you drive development from your phone without needing the computer.
-
-If you're a user or potential partner, the best way to reach the project is through the app itself or by posting roasts publicly with the link.
-
-## Testing Custom Images via Dev Chat
-
-Drop test photos (jpg/png) into `~/Desktop/Roastly images/`.
-
-Then instruct from dev-chat (or here):
-
-- "generate 5 crispy roasts using pexels-xxx.jpg from the Roastly images folder"
-- "post the 2nd roast to X as @roastlyapp using that image"
-
-I will:
-- Locate + resize + base64 the image from the folder
-- Call the live /api/generate-roast as owner (unlimited)
-- Return the options
-- Execute post-to-X on request (attaches the original image + chosen roast text)
-
-Great for testing new prompts/vibes or creating X content from your phone.
+For development instructions, changes, or posting (when acting as owner), provide them directly in this chat session. The in-app owner "Post to X @roastlyapp" button handles direct brand posts from the roast flow.
 
 ---
 

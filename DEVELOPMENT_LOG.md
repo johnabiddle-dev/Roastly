@@ -8,7 +8,7 @@
 
 **Repo**: Local at `~/Developer/roastly` (connected to GitHub for deploys).
 
-**Last Updated**: June 2026 (based on latest session)
+**Last Updated**: June 2026 (dev-chat feature removed due to operational issues)
 
 ---
 
@@ -27,13 +27,13 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 - Referral system (+5 bonus roasts for referrer on payer's first purchase).
 - Viral X copy buttons + direct "Post to X" (owner-only, posts as @roastlyapp).
 
-**Control from Phone**:
-- Owner-only `/dev-chat` page for live instructions ("update prompt", "post on X as @roastlyapp: ...", "deploy", etc.).
-- Background poller monitors messages.
+**Control / Instructions**:
+- Owner provides instructions directly in the AI chat session.
+- In-app owner-only "Post to X @roastlyapp" button for direct brand posts (inside the roast card modal).
 
 **X Presence**:
 - Brand account @roastlyapp.
-- Direct posting from app/dev-chat (owner only) using OAuth 1.0a keys.
+- Direct "Post to X @roastlyapp" button in the app (owner only, uses the 4 OAuth 1.0a keys).
 - Promo images for content.
 
 **Test Images**:
@@ -72,7 +72,7 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 - Usage lib: isOwner early return unlimited/no-consume.
 - No manual credits; server authoritative.
 - Versioned resets (USAGE_VERSION='v2') for old users on updates.
-- Owner can post as brand, control dev-chat.
+- Owner can post as brand (via in-app button).
 
 ### Roast Prompt Refinements
 - User provided exact Saucy Grok prompt blocks.
@@ -102,7 +102,7 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 
 ### Dev-Chat / Phone Control Bridge
 - User request: "build me something so we can continue this from my phone" + "execute based on a message from that chat".
-- /dev-chat page + /api/dev-chat: owner-gated (same UUID), appends to committed dev-chat-messages.json.
+- (dev-chat feature fully removed)
 - Live polling (every 5s), draft area, shareable link for state.
 - Background poller (tail + curl loop with owner header) surfaces new messages.
 - Instructions like: update prompt, deploy, "post on X as @roastlyapp: [text or thread]".
@@ -135,12 +135,11 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 - **lib/usage.ts**: In-memory + hybrid tracking, isOwner exact match, consume/markPaid, referrer bonuses, version reset.
 - **lib/stripe.ts**: Price ID constants (live).
 - **app/api/checkout/route.ts**, **mark-paid/route.ts**, **usage/route.ts**: Payment flow + limits.
-- **app/dev-chat/** + **api/dev-chat**: Owner live instruction channel + file persistence.
-- **app/api/is-owner/route.ts**: Simple check.
 - **public/**: SVGs/favicons.
 - **scripts/deploy.sh**: Interactive vercel --prod helper.
-- **dev-chat-messages.json**: Persisted instructions.
 - **.used.txt** (in Desktop folder): Tracks used test images (non-repeat).
+
+(Note: dev-chat page + API + is-owner route + dev-chat-messages.json were fully removed in June 2026.)
 
 ---
 
@@ -178,7 +177,7 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 - 4 keys (OAuth1 user context) â†’ posts as @roastlyapp.
 - Text + optional image (v1 upload + v2 tweet).
 - Tags appended server-side.
-- Also callable via dev-chat instructions.
+- (previously via dev-chat; now direct)
 
 **Dev-Chat**:
 - Owner only.
@@ -225,7 +224,7 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 
 **Phone Setup**:
 - Bookmarklet (see README) to set localStorage on /roast.
-- Dev-chat at /dev-chat for instructions.
+- (dev-chat removed)
 
 **Test Images**:
 - Folder: ~/Desktop/Roastly images/
@@ -242,10 +241,10 @@ Roastly lets users upload any screenshot, photo, text convo, meme â€” whatever â
 4. Set same in Vercel (Production).
 5. On your devices: set localStorage 'roastly-browser-id' to the exact UUID (use bookmarklet on live site).
 6. `npm run dev` or deploy with script.
-7. For X posts from AI: use dev-chat or direct instructions here with owner context.
+7. For X posts from AI: use the in-app owner "Post to X @roastlyapp" button or direct instructions here with owner context.
 8. For test images: drop in folder; AI will manage random non-repeat + generate/post.
 
-The source of truth for instructions is this log + dev-chat-messages.json + the live /dev-chat page.
+The source of truth for instructions is this log + direct chat with the AI in this session.
 
 ---
 
@@ -256,10 +255,10 @@ The source of truth for instructions is this log + dev-chat-messages.json + the 
 - Owner revenue dashboard.
 - More virality (better card CTAs, streaks).
 - Test images workflow fully exercised (random + best-pick + post).
-- Security: rotate owner ID periodically; consider extra owner gate for dev-chat/X.
+- Security: rotate owner ID periodically.
 - Content: more promo threads from the folder.
 
-**This log + the committed dev-chat-messages.json + README/HANDOFF/ROADMAP should give a strong restart point.**
+**This log + README/HANDOFF/ROADMAP should give a strong restart point.** (dev-chat files were removed)
 
 
 ## Terminal Access for Future Sessions
@@ -269,19 +268,11 @@ To quickly resume this exact development terminal context:
 - Open any terminal window.
 - Type: `roastly`
 
-This attaches to a persistent `tmux` session named `roastly-dev` that was created with project context, current directory, and reminders about key paths (dev-chat, test images folder, owner ID, live site, etc.).
+This attaches to a persistent `tmux` session named `roastly-dev` that was created with project context, current directory, and reminders about key paths (test images folder, owner ID, live site, etc.).
 
 Direct command (if alias not available): `tmux attach -t roastly-dev`
 
 The alias `roastly` was added to `~/.zshrc` for permanence.
-
-Background monitors for dev-chat (polling + log tail) are typically kept running separately. If needed, re-start with:
-```bash
-cd ~/Developer/roastly
-touch dev-chat.log
-tail -f dev-chat.log &
-# (and the polling loop if desired)
-```
 
 This setup allows easy re-entry even after closing terminals or reboots (tmux survives terminal closes).
 
