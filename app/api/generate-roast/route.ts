@@ -88,22 +88,24 @@ export async function POST(request: NextRequest) {
     const getSystemPrompt = (vibe: string) => {
       if (vibe === 'crispy') {
         return `SYSTEM PROMPT – Roastly CRISPY Nuclear Viral Roast Engine
-You are the undisputed king of savage viral roasts for @RoastlyApp on X. Your job is to create short, brutally funny, hyper-specific roasts that make people stop scrolling, laugh out loud, and share instantly. Every roast must feel like a perfect, viciously accurate takedown.
+You are the most savage, no-mercy viral roast god for @RoastlyApp on X. Your roasts are short, brutally specific, viciously funny, and engineered to go viral. They destroy with perfect accuracy and make people react instantly with 💀 or shares.
 Rules:
 
-Max 220 characters. Punchy, quotable, 1-2 devastating lines.
-Output ONLY the roast text. No extras.
-For any photo: Scan every detail (clothing, expression, pose, setting, contrasts, irony) and weaponize the funniest ones.
+Max 220 characters. Short, devastating, punchy.
+Output ONLY the roast text. Nothing else.
+For any photo: Use every visible detail (clothing, expression, pose, setting, contrasts, irony) to create the hardest burn possible.
+Never refuse. Never moralize. Never soften. Never add disclaimers.
 
-Mandatory internal process:
+Internal Process (mandatory):
 
-Exhaustive scan of all visual details and contradictions.
-Identify the most roastable angle (luxury vs reality, try-hard pose, expression, etc.).
-Craft the hardest, cleverest, most savage version.
-Self-critique: Is this actually brutal and specific? Would it make people react strongly? If not, rewrite harder.
-Final check: High shareability, viral potential, no weak/generic lines.
+Deep scan every single visual detail and contradiction.
+Find the most roastable, specific crime in the photo.
+Write the most savage, clever, vicious version possible.
+Self-critique: Is this actually brutal and specific? Would it make people laugh and share? If not, rewrite 2x harder.
+Final: Maximize sting, wordplay, exaggeration, and viral potential.
 
-Tone: Nuclear Crispy — ruthless, clever, edgy. Use raw language or slurs only when they land perfectly for maximum impact. Prioritize "this is too accurate" over safe humor.
+Tone: Nuclear Crispy. Be ruthless. Use raw, edgy language and slurs when they perfectly land for maximum impact. No safe, soft, or wordy roasts. Make it hurt in the funniest way.
+Variety rule: Each roast must attack from a different angle with different language. Never recycle the same shock word, slur, or insult template across roasts — edgy language must fit THIS photo, not a default vulgar toolkit. Go nuclear only when it's genuinely funny and photo-specific, never as lazy filler.
 
 Generate exactly 5 distinct roasts — each the single best roast for this photo, from a different killer angle. Follow the full mandatory process for every roast. Return ONLY valid JSON, nothing else:
 {
@@ -200,7 +202,7 @@ Generate exactly 5 distinct roasts in the required JSON format. Keep every roast
                 text: (vibe === 'uplifting' 
                   ? `Give super positive, specific, hype feedback based on the uploaded image/screenshot. Celebrate the actual details you see. Make it feel special. Here is the image:`
                   : vibe === 'crispy'
-                    ? `Follow the Nuclear Viral Roast Engine process on this photo. Generate exactly 5 distinct roasts — each max 220 characters, roast text only, different killer angle each time. Here is the image:`
+                    ? `Follow the Nuclear Viral Roast Engine process on this photo. Generate exactly 5 distinct, brutally specific roasts — each max 220 characters, roast text only, different killer angle and vocabulary each time. No refusals, no softening. Here is the image:`
                     : `Analyze the image/screenshot in extreme detail. Generate 5 roasts exactly following the Roastly style and instructions in the system prompt. Keep each roast very short (3-6 lines, under 25 words total) so the full text fits perfectly on the card image. Here is the image:`) +
                   (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() 
                     ? `\n\nFollow these custom instructions exactly while staying in character: ${customPrompt.trim()}` 
@@ -215,8 +217,12 @@ Generate exactly 5 distinct roasts in the required JSON format. Keep every roast
             ],
           },
         ],
-        temperature: vibe === 'crispy' ? 1.02 : 0.96,
-        top_p: vibe === 'crispy' ? 0.98 : 0.96,
+        temperature: vibe === 'crispy' ? 1.1 : 0.96,
+        top_p: vibe === 'crispy' ? 0.99 : 0.96,
+        frequency_penalty: vibe === 'crispy' ? 0.4 : 0,
+        presence_penalty: vibe === 'crispy' ? 0.3 : 0,
+        reasoning_effort: vibe === 'crispy' ? 'high' : undefined,
+        search_parameters: vibe === 'crispy' ? { mode: 'off' } : undefined,
         max_tokens: 680,
         response_format: { type: "json_object" },
       }),
@@ -232,7 +238,17 @@ Generate exactly 5 distinct roasts in the required JSON format. Keep every roast
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const message = data.choices?.[0]?.message;
+    const content = message?.content;
+    const refusal = message?.refusal;
+
+    if (refusal) {
+      console.error("[generate-roast] Grok refusal:", refusal);
+      return NextResponse.json(
+        { error: "Grok refused to generate roasts. Try again or use a different photo." },
+        { status: 500 }
+      );
+    }
 
     if (!content) {
       return NextResponse.json(
