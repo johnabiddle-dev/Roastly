@@ -28,10 +28,9 @@ export async function generateRoastCardImage(
     img.src = imageUrl;
   });
 
-  // Photo area: centered, with border, similar to DOM
-  // Even larger photo area so the uploaded photo takes up most of the card (to match the preview look users like)
+  // Photo area: large but leave room for bold, readable roast text below
   const photoMaxWidth = 900;
-  const photoMaxHeight = 1050;
+  const photoMaxHeight = 880;
   const borderWidth = 12;
 
   let photoWidth = img.width;
@@ -115,13 +114,16 @@ export async function generateRoastCardImage(
     destX, destY, destWidth, destHeight
   );
 
-  // Roast text area — dynamic font size + centering so the COMPLETE roast text always fits and shows (no cut off)
-  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 10;
-  const textAreaBottom = CARD_HEIGHT - 75; // stop text before branding
-  const maxAvailableHeight = Math.max(180, textAreaBottom - textAreaTop);
-  const maxTextWidth = CARD_WIDTH - 140;
+  // Roast text area — pick the LARGEST font that fits so short roasts feel bold on the card
+  const textAreaTop = photoY + photoHeight + borderWidth * 2 + 24;
+  const textAreaBottom = CARD_HEIGHT - 140; // clear space above branding
+  const maxAvailableHeight = Math.max(220, textAreaBottom - textAreaTop);
+  const maxTextWidth = CARD_WIDTH - 80;
+  const minFontSize = 36;
+  const maxFontSize = 72;
+  const fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-  let fontSize = 36;
+  let fontSize = minFontSize;
   let lineHeight = fontSize * 1.32;
   let lines: string[] = [];
 
@@ -148,17 +150,28 @@ export async function generateRoastCardImage(
     return result;
   };
 
-  // Reduce font size until text fits in available vertical space (min 28px)
-  while (fontSize >= 28) {
-    const testFont = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-    lines = wrapText(roastText, testFont, maxTextWidth);
-    lineHeight = fontSize * 1.38;
-    const needed = lines.length * lineHeight;
-    if (needed <= maxAvailableHeight) break;
-    fontSize -= 4;
+  // Scale UP from min — pick the biggest size that still fits (short roasts get huge type)
+  for (let testSize = maxFontSize; testSize >= minFontSize; testSize -= 2) {
+    const testFont = `700 ${testSize}px ${fontFamily}`;
+    const testLines = wrapText(roastText, testFont, maxTextWidth);
+    const testLineHeight = testSize * 1.32;
+    const needed = testLines.length * testLineHeight;
+    if (needed <= maxAvailableHeight) {
+      fontSize = testSize;
+      lines = testLines;
+      lineHeight = testLineHeight;
+      break;
+    }
   }
 
-  // If still too tall even at min font, use tighter line spacing instead of dropping text
+  // Fallback wrap at minimum size if nothing fit
+  if (lines.length === 0) {
+    fontSize = minFontSize;
+    lineHeight = fontSize * 1.32;
+    lines = wrapText(roastText, `700 ${fontSize}px ${fontFamily}`, maxTextWidth);
+  }
+
+  // If still too tall at min font, tighten line spacing instead of shrinking text further
   let effectiveLineHeight = lineHeight;
   const neededHeight = lines.length * lineHeight;
   if (neededHeight > maxAvailableHeight) {
@@ -171,7 +184,7 @@ export async function generateRoastCardImage(
 
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
-  ctx.font = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  ctx.font = `700 ${fontSize}px ${fontFamily}`;
 
   for (const line of lines) {
     ctx.fillText(line, CARD_WIDTH / 2, y);

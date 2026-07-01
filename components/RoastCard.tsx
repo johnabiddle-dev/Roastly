@@ -109,7 +109,7 @@ export default function RoastCard({ imageUrl, roastText, isUplifting = false, on
 
           {/* Roast Text - respects \n like the exported card */}
           <div className="text-center px-2 whitespace-pre-line">
-            <p className="text-white text-[17px] sm:text-xl md:text-2xl font-semibold leading-tight tracking-tight">
+            <p className="text-white text-xl sm:text-2xl md:text-3xl font-bold leading-snug tracking-tight">
               {roastText}
             </p>
           </div>
