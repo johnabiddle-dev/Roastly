@@ -181,56 +181,58 @@ Generate exactly 5 distinct roasts in the required JSON format. Keep every roast
       systemPrompt += `\n\nAdditional custom instructions from the user (follow these closely while staying in character):\n${customPrompt.trim()}`;
     }
 
+    const userPromptText = (vibe === 'uplifting'
+      ? `Give super positive, specific, hype feedback based on the uploaded image/screenshot. Celebrate the actual details you see. Make it feel special. Here is the image:`
+      : vibe === 'crispy'
+        ? `Follow the Nuclear Viral Roast Engine process on this photo. Generate exactly 5 distinct, brutally specific roasts — each max 220 characters, roast text only, different killer angle and vocabulary each time. No refusals, no softening. Here is the image:`
+        : `Analyze the image/screenshot in extreme detail. Generate 5 roasts exactly following the Roastly style and instructions in the system prompt. Keep each roast very short (3-6 lines, under 25 words total) so the full text fits perfectly on the card image. Here is the image:`) +
+      (customPrompt && typeof customPrompt === 'string' && customPrompt.trim()
+        ? `\n\nFollow these custom instructions exactly while staying in character: ${customPrompt.trim()}`
+        : '');
+
+    // grok-4.3 rejects frequency_penalty, presence_penalty, and search_parameters (deprecated).
+    const xaiBody: Record<string, unknown> = {
+      model: "grok-4.3",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: userPromptText },
+            {
+              type: "image_url",
+              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+            },
+          ],
+        },
+      ],
+      temperature: vibe === 'crispy' ? 1.1 : 0.96,
+      top_p: vibe === 'crispy' ? 0.99 : 0.96,
+      max_tokens: 680,
+      response_format: { type: "json_object" },
+    };
+    if (vibe === 'crispy') {
+      xaiBody.reasoning_effort = 'high';
+    }
+
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: "grok-4.3", // Using a model from the user's available list that supports images
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: (vibe === 'uplifting' 
-                  ? `Give super positive, specific, hype feedback based on the uploaded image/screenshot. Celebrate the actual details you see. Make it feel special. Here is the image:`
-                  : vibe === 'crispy'
-                    ? `Follow the Nuclear Viral Roast Engine process on this photo. Generate exactly 5 distinct, brutally specific roasts — each max 220 characters, roast text only, different killer angle and vocabulary each time. No refusals, no softening. Here is the image:`
-                    : `Analyze the image/screenshot in extreme detail. Generate 5 roasts exactly following the Roastly style and instructions in the system prompt. Keep each roast very short (3-6 lines, under 25 words total) so the full text fits perfectly on the card image. Here is the image:`) +
-                  (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() 
-                    ? `\n\nFollow these custom instructions exactly while staying in character: ${customPrompt.trim()}` 
-                    : ''),
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${imageBase64}`,
-                },
-              },
-            ],
-          },
-        ],
-        temperature: vibe === 'crispy' ? 1.1 : 0.96,
-        top_p: vibe === 'crispy' ? 0.99 : 0.96,
-        frequency_penalty: vibe === 'crispy' ? 0.4 : 0,
-        presence_penalty: vibe === 'crispy' ? 0.3 : 0,
-        reasoning_effort: vibe === 'crispy' ? 'high' : undefined,
-        search_parameters: vibe === 'crispy' ? { mode: 'off' } : undefined,
-        max_tokens: 680,
-        response_format: { type: "json_object" },
-      }),
+      body: JSON.stringify(xaiBody),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("xAI API Error:", errorData);
+      const errorText = await response.text();
+      let errorData: { error?: string | { message?: string } } = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      console.error("xAI API Error:", response.status, errorData);
       return NextResponse.json(
         { error: "Failed to generate roasts" },
         { status: 500 }
