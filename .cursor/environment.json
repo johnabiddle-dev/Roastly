@@ -1,0 +1,17 @@
+{
+  "name": "Roastly",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "npm run dev",
+      "description": "Next.js dev server (http://localhost:3000). The UI and /api/usage work without secrets; roast generation needs XAI_API_KEY, Stripe checkout needs STRIPE_SECRET_KEY, and posting to X needs the X_* keys."
+    }
+  ],
+  "ports": [
+    {
+      "name": "web",
+      "port": 3000
+    }
+  ]
+}
