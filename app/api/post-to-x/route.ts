@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TwitterApi } from "twitter-api-v2";
+import { constantTimeEqual } from "@/lib/usage";
 
 // Owner-only: posts the roast + full branded card image directly to X as @roastlyapp.
 // The client sends a complete caption containing the roast text + CTA + hashtags.
@@ -10,10 +11,9 @@ export const runtime = 'nodejs';
 const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || "";
 
 function isOwner(req: NextRequest): boolean {
-  const browserId = req.headers.get("x-roastly-browser-id") || "";
-  const cleanBrowser = browserId.trim();
+  const cleanBrowser = (req.headers.get("x-roastly-browser-id") || "").trim();
   const cleanOwner = OWNER_BROWSER_ID.trim();
-  return !!cleanOwner && cleanBrowser === cleanOwner;
+  return !!cleanOwner && constantTimeEqual(cleanBrowser, cleanOwner);
 }
 
 export async function POST(req: NextRequest) {
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     if (tweetText.length > 280) {
       tweetText = tweetText.slice(0, 277) + "...";
     }
-    const tweetOptions: any = { text: tweetText };
+    const tweetOptions: { text: string; media?: { media_ids: [string] } } = { text: tweetText };
     if (mediaId) {
       tweetOptions.media = { media_ids: [mediaId] };
     }
@@ -96,11 +96,9 @@ export async function POST(req: NextRequest) {
       tweetId: tweet.data.id,
       url: `https://x.com/${username}/status/${tweet.data.id}`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("X Post Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to post to X" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to post to X";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

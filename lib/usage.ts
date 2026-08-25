@@ -1,6 +1,16 @@
 // Simple in-memory store for MVP (resets on server restart / across serverless instances)
 // In production we'll move this to Supabase or Vercel KV for reliable paid tracking
 import { NextRequest } from "next/server";
+import { createHash, timingSafeEqual } from "crypto";
+
+// Compare two secrets in constant time so the owner key can't be recovered
+// via response-timing differences. Hashing first keeps the compared buffers
+// the same length regardless of input length.
+export function constantTimeEqual(a: string, b: string): boolean {
+  const ah = createHash("sha256").update(a).digest();
+  const bh = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ah, bh);
+}
 
 export type UsageRecord = {
   freeUsed: number;           // total lifetime for free users
@@ -29,7 +39,7 @@ const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || '';
 function isOwner(browserId: string): boolean {
   const cleanBrowser = (browserId || '').trim();
   const cleanOwner = (OWNER_BROWSER_ID || '').trim();
-  return !!cleanOwner && cleanBrowser === cleanOwner;
+  return !!cleanOwner && constantTimeEqual(cleanBrowser, cleanOwner);
 }
 
 function getOrCreateRecord(userId: string): UsageRecord {
