@@ -49,11 +49,11 @@ Owner unlimited access:
 3. In your browser console on the site: `localStorage.setItem('roastly-browser-id', 'THE-EXACT-UUID')`
 This gives you (and only you) permanent unlimited roasts + custom prompts. No public backdoors.
 
-**CRITICAL SECURITY NOTE:** The OWNER_BROWSER_ID is the master key for the entire site (unlimited roasts, custom prompts, direct posting as @roastlyapp on X, etc.). Treat it like a high-value password:
-- Never commit it.
+**CRITICAL SECURITY NOTE:** The OWNER_BROWSER_ID is the master key for the entire site (unlimited roasts, custom prompts, direct posting as @roastlyapp on X, etc.). It is sent on every request in the `x-roastly-browser-id` header, so treat it like a high-value bearer password:
+- Never commit it. (A prior UUID was committed to this repo's docs and git history — it is compromised. Generate a brand-new UUID, set it in Vercel, and update your devices' localStorage. Do not reuse the old value.)
 - Never share the value.
 - Set it only on devices you fully control.
-- Rotate periodically (new UUID in Vercel + update your devices' localStorage) if concerned about leakage.
+- Rotate periodically (new UUID in Vercel + update your devices' localStorage), and immediately if you suspect leakage.
 
 How to add the env var in Vercel:
 - Use the search bar at the top to find and click your "roastly" project.
@@ -61,7 +61,7 @@ How to add the env var in Vercel:
 - In the left sidebar, click **Environment Variables**.
 - Click "Add New".
 - Key: OWNER_BROWSER_ID
-- Value: paste your UUID exactly (E36C00A1-8B98-4466-84C0-949443E24962)
+- Value: paste your own freshly generated UUID exactly (do NOT reuse any value that was ever committed to this repo)
 - Environment: select Production
 - Save, then Redeploy (from Deployments tab).
 
@@ -70,7 +70,7 @@ Use this bookmarklet on the live site in Safari:
 1. On phone, go to https://roastly-app.vercel.app/roast
 2. Tap Share button > Add Bookmark (name it "Set Owner ID")
 3. Edit the bookmark, replace the entire URL with this exact text:
-javascript:(function(){localStorage.setItem('roastly-browser-id','E36C00A1-8B98-4466-84C0-949443E24962');alert('Owner ID set! Hard refresh the page (pull down).');})();
+javascript:(function(){localStorage.setItem('roastly-browser-id','<YOUR-OWNER-UUID>');alert('Owner ID set! Hard refresh the page (pull down).');})();
 4. While still on the roast page, tap your new "Set Owner ID" bookmark from the bookmarks menu.
 5. Hard refresh the page.
 You should now have unlimited roasts on phone too. Use the exact same ID on all your devices.
