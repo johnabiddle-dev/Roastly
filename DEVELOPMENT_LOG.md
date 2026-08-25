@@ -208,7 +208,7 @@ Roastly lets users upload any screenshot, photo, text convo, meme — whatever �
 **Vercel**:
 - Project: roastly-app (https://roastly-app.vercel.app)
 - Deploy from `~/Developer/roastly`
-- Env vars (Production): see above + exact OWNER_BROWSER_ID = E36C00A1-8B98-4466-84C0-949443E24962
+- Env vars (Production): see above + OWNER_BROWSER_ID (set to a private UUID — never record the real value here)
 
 **Stripe**:
 - Live mode prices in lib/stripe.ts (confirm in dashboard).
@@ -219,8 +219,8 @@ Roastly lets users upload any screenshot, photo, text convo, meme — whatever �
 - Developer app with OAuth 1.0a Read+Write keys (4 values in Vercel as X_API_*).
 - Callback: https://roastly-app.vercel.app + http://127.0.0.1
 
-**Owner ID** (exact, no extra chars):
-`E36C00A1-8B98-4466-84C0-949443E24962`
+**Owner ID**:
+Stored only as the `OWNER_BROWSER_ID` env var in Vercel (and in your own devices' localStorage). The value previously written here was committed to git and is compromised — rotate it to a new UUID and never paste the real value into this file.
 
 **Phone Setup**:
 - Bookmarklet (see README) to set localStorage on /roast.
