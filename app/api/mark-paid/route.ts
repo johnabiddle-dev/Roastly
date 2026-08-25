@@ -41,6 +41,18 @@ export async function POST(request: NextRequest) {
     // All paid products (one-time packs + pro sub) unlock the daily cap for now.
     const purchasedPriceId = (session.metadata?.priceId as string) || "";
 
+    // Only unlock benefits for a price we actually sell. Without this, any
+    // completed Checkout Session on the account (or one missing our metadata)
+    // would grant paid access. The priceId is stamped into metadata by our own
+    // /api/checkout route, so legitimate sessions always carry a known value.
+    const validPriceIds = Object.values(STRIPE_PRICES) as string[];
+    if (!validPriceIds.includes(purchasedPriceId)) {
+      return NextResponse.json(
+        { error: "Unrecognized purchase; no benefits granted." },
+        { status: 400 }
+      );
+    }
+
     if (purchasedPriceId === STRIPE_PRICES.customPrompts) {
       // This is the add-on only
       markCustomPromptsUnlocked(userId);
@@ -87,11 +99,9 @@ export async function POST(request: NextRequest) {
       isSubscription,
       isCustomPromptsAddOn,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Mark paid error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to mark as paid" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to mark as paid";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
