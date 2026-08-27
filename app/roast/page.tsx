@@ -1,115 +1,152 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import RoastCard from '@/components/RoastCard';
-import { STRIPE_PRICES } from '@/lib/stripe';
-import { generateRoastCardImage } from '@/lib/generate-card';
-import { USAGE_VERSION } from '@/lib/usage';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import RoastCard, { postCardToX } from '@/components/RoastCard';
+import UpgradeModal from '@/components/UpgradeModal';
+import { DEFAULT_STYLE_ID, ROAST_STYLES, getRoastStyle, isPaidUser, type RoastStyleId } from '@/lib/roast-styles';
+import { shareButtonLabel, shareOrCopyCard } from '@/lib/share';
+import { getBrowserId, startCheckout } from '@/lib/client';
+import { USAGE_VERSION } from '@/lib/constants';
+import type { UsageStatus } from '@/lib/types';
+import { getFreeLimit, getJuly4PromoBanner } from '@/lib/promo';
+import { trackEvent } from '@/lib/analytics';
+
+const HEAT = [
+  { value: 'crispy', label: 'Crispy' },
+  { value: 'medium_rare', label: 'Medium Rare' },
+  { value: 'light_toast', label: 'Light Toast' },
+  { value: 'uplifting', label: 'Uplifting' },
+] as const;
+
+const STEPS = [
+  { key: 'analyzing', label: 'Analyzing' },
+  { key: 'cooking', label: 'Cooking' },
+  { key: 'writing', label: 'Writing burns' },
+];
+
+const FORMAT_ERROR = "This image format isn't supported. Try taking a new photo or saving it as a JPEG first.";
+
+function getClientFreeUsed(browserId: string): number {
+  return parseInt(localStorage.getItem(`roastly-${USAGE_VERSION}-free-used-${browserId}`) || '0', 10);
+}
+
+function setClientFreeUsed(browserId: string, used: number) {
+  localStorage.setItem(`roastly-${USAGE_VERSION}-free-used-${browserId}`, String(used));
+}
+
+function fileKey(file: File) {
+  return `${file.name}|${file.size}|${file.lastModified}`;
+}
+
+function canAutoStart(usage: UsageStatus | null) {
+  if (!usage || (usage.credits ?? 0) > 0) return !usage || usage.remaining > 0;
+  return usage.remaining > 0;
+}
+
+function resizeToJpeg(file: File, maxSize = 768): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let { width, height } = img;
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = Math.round((maxSize / width) * height);
+              width = maxSize;
+            } else {
+              width = Math.round((maxSize / height) * width);
+              height = maxSize;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Canvas context not available'));
+          ctx.drawImage(img, 0, 0, width, height);
+          const base64 = canvas.toDataURL('image/jpeg', 0.78).split(',')[1];
+          if (!base64) return reject(new Error(FORMAT_ERROR));
+          resolve(base64);
+        } catch {
+          reject(new Error(FORMAT_ERROR));
+        }
+      };
+      img.onerror = () => reject(new Error(FORMAT_ERROR));
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error(FORMAT_ERROR));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function RoastPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState('');
+  const [stepIndex, setStepIndex] = useState(0);
   const [roasts, setRoasts] = useState<string[]>([]);
   const [showCard, setShowCard] = useState(false);
-  const [selectedRoastForCard, setSelectedRoastForCard] = useState('');
-  const [vibe, setVibe] = useState<'crispy' | 'medium_rare' | 'light_toast' | 'uplifting'>('crispy');
+  const [selectedRoast, setSelectedRoast] = useState('');
+  const [vibe, setVibe] = useState<(typeof HEAT)[number]['value']>('crispy');
+  const [styleId, setStyleId] = useState<RoastStyleId>(DEFAULT_STYLE_ID);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [usage, setUsage] = useState<{ used: number; remaining: number; limit: number; isPaid: boolean; hasCustomPrompts?: boolean; bonusRoasts?: number; referredBy?: string } | null>(null);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-  const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
-
-  const getOrCreateBrowserId = () => {
-    if (typeof window === "undefined") return "server";
-    let id = localStorage.getItem("roastly-browser-id");
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem("roastly-browser-id", id);
-    }
-    return id;
-  };
-
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [usage, setUsage] = useState<UsageStatus | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [firstRoastOffer, setFirstRoastOffer] = useState(false);
+  const [limitBanner, setLimitBanner] = useState(false);
+  const [paidBanner, setPaidBanner] = useState(false);
+  const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [autoHint, setAutoHint] = useState(false);
+  const [styleIntent, setStyleIntent] = useState<string | null>(null);
+  const [pickedIndex, setPickedIndex] = useState(0);
+  const [resultsShare, setResultsShare] = useState<'idle' | 'saving' | 'shared' | 'copied' | 'downloaded' | 'error'>('idle');
 
-  // No public reset mechanisms for security. Owner uses OWNER_BROWSER_ID env var for unlimited access.
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const generatingRef = useRef(false);
+  const lastAutoKey = useRef<string | null>(null);
+  const fileRef = useRef<File | null>(null);
+  const usageRef = useRef<UsageStatus | null>(null);
+  const vibeRef = useRef(vibe);
+  const styleRef = useRef(styleId);
+  const promptRef = useRef(customPrompt);
+  const generateRef = useRef<(source?: string) => Promise<void>>(async () => {});
 
-  // Client-side free limit tracking (survives serverless). Bumped via USAGE_VERSION to reset globally.
-  const getClientFreeUsed = (browserId: string): number => {
-    if (typeof window === "undefined") return 0;
-    const key = `roastly-${USAGE_VERSION}-free-used-${browserId}`;
-    return parseInt(localStorage.getItem(key) || "0", 10);
-  };
+  useEffect(() => { usageRef.current = usage; }, [usage]);
+  useEffect(() => { fileRef.current = selectedFile; }, [selectedFile]);
+  useEffect(() => { vibeRef.current = vibe; }, [vibe]);
+  useEffect(() => { styleRef.current = styleId; }, [styleId]);
+  useEffect(() => { promptRef.current = customPrompt; }, [customPrompt]);
 
-  const setClientFreeUsed = (browserId: string, used: number) => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(`roastly-${USAGE_VERSION}-free-used-${browserId}`, String(used));
-  };
+  const paid = isPaidUser(usage);
 
-  // Resize and convert image to JPEG base64 for reliable sending (especially from mobile/HEIC)
-  const resizeAndConvertToBase64 = (file: File, maxSize = 1024): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          let { width, height } = img;
-          if (width > maxSize || height > maxSize) {
-            if (width > height) {
-              height = Math.round(height * (maxSize / width));
-              width = maxSize;
-            } else {
-              width = Math.round(width * (maxSize / height));
-              height = maxSize;
-            }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-            const base64 = dataUrl.split(",")[1];
-            resolve(base64);
-          } else {
-            reject(new Error("Canvas context not available"));
-          }
-        };
-        img.onerror = () => reject(new Error("Failed to load image"));
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-  };
+  const clearAuto = useCallback(() => {
+    if (autoTimer.current) {
+      clearTimeout(autoTimer.current);
+      autoTimer.current = null;
+    }
+    setAutoHint(false);
+  }, []);
 
-  const fetchUsage = async () => {
+  const fetchUsage = useCallback(async () => {
     try {
-      const headers: Record<string, string> = {
-        "x-roastly-browser-id": getOrCreateBrowserId(),
-      };
-      const storedReferrer = typeof window !== "undefined" ? localStorage.getItem("roastly-referrer") : null;
-      if (storedReferrer) {
-        headers["x-roastly-referrer"] = storedReferrer;
-      }
-
-      const res = await fetch("/api/usage", {
-        headers,
-      });
+      const headers: Record<string, string> = { 'x-roastly-browser-id': getBrowserId() };
+      const storedReferrer = localStorage.getItem('roastly-referrer');
+      if (storedReferrer) headers['x-roastly-referrer'] = storedReferrer;
+      const res = await fetch('/api/usage', { headers });
       const data = await res.json();
-      const browserId = getOrCreateBrowserId();
-
-      if (data && !data.isPaid) {
+      const browserId = getBrowserId();
+      const credits = data.credits ?? 0;
+      if (data && credits === 0) {
         const clientUsed = getClientFreeUsed(browserId);
+        const limit = data.limit || getFreeLimit();
         if (clientUsed > (data.used || 0)) {
-          const remaining = Math.max(0, 3 - clientUsed);
-          setUsage({
-            ...data,
-            used: clientUsed,
-            remaining,
-          });
+          const remaining = Math.max(0, limit - clientUsed);
+          setUsage({ ...data, used: clientUsed, freeRemaining: remaining, remaining: remaining + credits, limit, credits });
         } else {
           setClientFreeUsed(browserId, data.used || 0);
           setUsage(data);
@@ -117,628 +154,717 @@ export default function RoastPage() {
       } else {
         setUsage(data);
       }
-    } catch (e) {
-      console.error("Failed to fetch usage", e);
+    } catch (err) {
+      console.error('Failed to fetch usage', err);
     }
-  };
-
-  // Fetch usage when component loads
-  useEffect(() => {
-    // Capture referral if present in URL (for growth / getting more users)
-    const browserId = getOrCreateBrowserId();
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      const ref = url.searchParams.get("ref");
-      if (ref && ref !== browserId) {
-        localStorage.setItem("roastly-referrer", ref);
-        // clean the URL so it doesn't stay in history
-        url.searchParams.delete("ref");
-        window.history.replaceState({}, "", url.toString());
-      }
-    }
-
-    fetchUsage();
   }, []);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setError("");
-      setSelectedFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreviewUrl(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    const browserId = getBrowserId();
+    let openUpgrade = false;
+    let paidOk = false;
+    const url = new URL(window.location.href);
+    const ref = url.searchParams.get('ref');
+    if (ref && ref !== browserId) localStorage.setItem('roastly-referrer', ref);
+    if (url.searchParams.get('upgrade') === '1') openUpgrade = true;
+    if (url.searchParams.get('paid') === '1') paidOk = true;
+    url.searchParams.delete('ref');
+    url.searchParams.delete('upgrade');
+    url.searchParams.delete('paid');
+    window.history.replaceState({}, '', url.toString());
+    const t = setTimeout(() => {
+      if (openUpgrade) setShowUpgrade(true);
+      if (paidOk) setPaidBanner(true);
+      fetchUsage();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [fetchUsage]);
+
+  const scheduleAuto = useCallback((file: File) => {
+    const key = fileKey(file);
+    if (lastAutoKey.current === key || generatingRef.current) return;
+    if (autoTimer.current) {
+      clearTimeout(autoTimer.current);
+      autoTimer.current = null;
     }
-  };
+    if (!canAutoStart(usageRef.current)) {
+      setAutoHint(false);
+      return;
+    }
+    lastAutoKey.current = key;
+    setAutoHint(true);
+    autoTimer.current = setTimeout(() => {
+      autoTimer.current = null;
+      setAutoHint(false);
+      if (fileRef.current !== file || generatingRef.current) return;
+      if (canAutoStart(usageRef.current)) generateRef.current('auto');
+    }, 1000);
+  }, []);
 
-  const handleGetRoasted = async () => {
-    if (!selectedFile) return;
+  const selectFile = useCallback((file: File, source: string) => {
+    clearAuto();
+    lastAutoKey.current = null;
+    setError('');
+    setRoasts([]);
+    setSelectedFile(file);
+    fileRef.current = file;
+    setPreviewUrl(null);
+    setShowCustomize(false);
+    setShowCard(false);
+    setSelectedRoast('');
+    trackEvent('photo_selected', { source, sizeKb: Math.round(file.size / 1024), type: (file.type || 'unknown').slice(0, 40) });
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPreviewUrl(event.target?.result as string);
+      scheduleAuto(file);
+    };
+    reader.onerror = () => {
+      setError(FORMAT_ERROR);
+      trackEvent('generate_failed', { error: 'preview_read_failed' });
+    };
+    reader.readAsDataURL(file);
+  }, [clearAuto, scheduleAuto]);
 
+  const generate = useCallback(async (source = 'button') => {
+    const file = fileRef.current;
+    if (!file || generatingRef.current) return;
+    clearAuto();
+    lastAutoKey.current = fileKey(file);
+    const currentVibe = vibeRef.current;
+    const currentStyle = styleRef.current;
+    const currentPrompt = promptRef.current;
+    const currentUsage = usageRef.current;
+    trackEvent('generate_clicked', { source, vibe: currentVibe, remaining: currentUsage?.remaining ?? -1 });
+    generatingRef.current = true;
     setIsGenerating(true);
+    setStepIndex(0);
+    setError('');
     const messages = [
-      "Analyzing every pixel...",
-      "Grok is cooking...",
-      "Finding the weak spots...",
-      "Reading the room (and destroying it)...",
-      "Crafting elite burns..."
+      'Analyzing every pixel...',
+      'Grok is cooking...',
+      'Finding the weak spots...',
+      'Reading the room...',
+      'Crafting elite burns...',
     ];
     setGeneratingMessage(messages[0]);
     let msgIndex = 0;
-    const msgInterval = setInterval(() => {
+    let step = 0;
+    const interval = setInterval(() => {
       msgIndex = (msgIndex + 1) % messages.length;
       setGeneratingMessage(messages[msgIndex]);
+      if (msgIndex % 2 === 0 && step < STEPS.length - 1) {
+        step += 1;
+        setStepIndex(step);
+      }
     }, 420);
-
+    const started = Date.now();
     try {
-      setError("");
-
-      const browserId = getOrCreateBrowserId();
+      const browserId = getBrowserId();
       const clientUsed = getClientFreeUsed(browserId);
-
-      if (usage && usage.remaining <= 0) {
-        setShowUpgradeModal(true);
-        setIsGenerating(false);
-        clearInterval(msgInterval);
-        setGeneratingMessage('');
+      if (currentUsage && currentUsage.remaining <= 0) {
+        setShowUpgrade(true);
+        trackEvent('generate_failed', { error: 'limit_precheck', source });
         return;
       }
-
-      const base64 = await resizeAndConvertToBase64(selectedFile);
-
-      const response = await fetch("/api/generate-roast", {
-        method: "POST",
+      let base64: string;
+      try {
+        base64 = await resizeToJpeg(file);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : FORMAT_ERROR;
+        setError(message.includes("isn't supported") ? message : FORMAT_ERROR);
+        trackEvent('generate_failed', { error: 'image_decode', source, ms: Date.now() - started });
+        return;
+      }
+      const styleToSend = isPaidUser(currentUsage) ? currentStyle : DEFAULT_STYLE_ID;
+      trackEvent('generate_started', { source, vibe: currentVibe, style: styleToSend });
+      const response = await fetch('/api/generate-roast', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "x-roastly-browser-id": getOrCreateBrowserId(),
+          'Content-Type': 'application/json',
+          'x-roastly-browser-id': getBrowserId(),
         },
         body: JSON.stringify({
           imageBase64: base64,
-          vibe: vibe,
-          customPrompt: customPrompt.trim() || undefined,
+          vibe: currentVibe,
+          style: styleToSend,
+          customPrompt: currentPrompt.trim() || undefined,
         }),
       });
-
-      const data = await response.json();
-
-      if (data.error) {
-        setError(data.error);
-      } else if (data.roasts && data.roasts.length > 0) {
-        setRoasts(data.roasts);
-        setClientFreeUsed(browserId, clientUsed + 1);
-        await fetchUsage();
-      } else {
-        setError("No roasts were generated. Try again.");
+      const data = await response.json().catch(() => ({}));
+      const ms = Date.now() - started;
+      if (!response.ok || data.error) {
+        if (data.remaining === 0 || (typeof data.error === 'string' && data.error.includes('limit')) || data.code === 'STYLE_REQUIRES_PAID') {
+          setShowUpgrade(true);
+        }
+        setError(typeof data.error === 'string' ? data.error : 'Failed to generate roasts. Try again.');
+        trackEvent('generate_failed', { error: data.code || 'api_error', status: response.status, source, ms });
+        return;
       }
-    } catch (error) {
-      console.error(error);
-      setError("Something went wrong while generating roasts.");
+      if (!data.roasts || data.roasts.length === 0) {
+        setError('No roasts were generated. Try again.');
+        trackEvent('generate_failed', { error: 'empty_roasts', source, ms });
+        return;
+      }
+      setRoasts(data.roasts);
+      setSelectedRoast(data.roasts[0]);
+      setShowCard(true);
+      setStepIndex(STEPS.length - 1);
+      trackEvent('roast_card_opened', { index: 0, source: 'auto' });
+      const usedCredits = (currentUsage?.credits ?? 0) > 0;
+      if (!usedCredits) setClientFreeUsed(browserId, clientUsed + 1);
+      trackEvent('generate_succeeded', { source, vibe: currentVibe, style: styleToSend, count: data.roasts.length, ms });
+      trackEvent('roast_generated', { vibe: currentVibe, style: styleToSend, count: data.roasts.length });
+      await fetchUsage();
+      if (!usedCredits && clientUsed + 1 >= getFreeLimit()) setLimitBanner(true);
+      else if (clientUsed === 0 && !usedCredits) setFirstRoastOffer(true);
+    } catch (err) {
+      console.error(err);
+      setError('Something went wrong while generating roasts.');
+      trackEvent('generate_failed', { error: 'network', source, ms: Date.now() - started });
     } finally {
-      clearInterval(msgInterval);
+      clearInterval(interval);
       setGeneratingMessage('');
       setIsGenerating(false);
+      generatingRef.current = false;
     }
-  };
+  }, [clearAuto, fetchUsage]);
+
+  useEffect(() => {
+    generateRef.current = generate;
+  }, [generate]);
+
+  useEffect(() => {
+    if (!selectedFile || !previewUrl || roasts.length > 0 || generatingRef.current || autoTimer.current) return;
+    if (lastAutoKey.current === fileKey(selectedFile)) return;
+    if (canAutoStart(usage)) scheduleAuto(selectedFile);
+  }, [usage, selectedFile, previewUrl, roasts.length, scheduleAuto]);
 
   const resetUpload = () => {
+    clearAuto();
+    lastAutoKey.current = null;
     setSelectedFile(null);
+    fileRef.current = null;
     setPreviewUrl(null);
     setRoasts([]);
-    setError("");
-    setCustomPrompt("");
-    // Note: usage refetch happens on next generate
+    setError('');
+    setCustomPrompt('');
+    setShowCustomize(false);
+    setShowCard(false);
+    setSelectedRoast('');
   };
 
-  const handleRegenerate = () => {
-    setRoasts([]);
-    handleGetRoasted();
+  const usageLabel = () => {
+    if (!usage) return 'Loading...';
+    if (usage.remaining > 100000) return 'Unlimited (owner)';
+    const free = usage.freeRemaining ?? (usage.isPaid ? 0 : usage.remaining);
+    const credits = usage.credits ?? (usage.isPaid ? usage.remaining : 0);
+    if (credits > 0 && free > 0) return `${free} free + ${credits} credits left`;
+    if (credits > 0) return `${credits} roast credit${credits === 1 ? '' : 's'} left`;
+    return `${free} free left`;
   };
 
-  // Post the current roast + the full branded card image directly to X as @roastlyapp
-  const postToX = async (roastText: string) => {
-    if (!previewUrl) {
-      alert("No image available to post.");
-      return;
-    }
+  const remainingLine = () => {
+    if (!usage || usage.remaining > 100000) return null;
+    const free = usage.freeRemaining ?? (usage.isPaid ? 0 : usage.remaining);
+    const credits = usage.credits ?? 0;
+    return credits > 0 ? `${credits} credit${credits === 1 ? '' : 's'} left` : `${free} of ${usage.limit || getFreeLimit()} free left`;
+  };
 
+  const checkout = async (priceId: string) => {
+    setCheckingOut(priceId);
     try {
-      // Generate the exact same styled card PNG (photo + roast baked in + branding)
-      const cardBase64 = await generateRoastCardImage(previewUrl, roastText, vibe === 'uplifting');
-
-      // High-virality caption for direct brand post on X.
-      // Roast text first (the star), then hook + hashtags.
-      let postCaption = `${roastText.trim()}\n\nRoast anything with Grok → roastly-app.vercel.app\n\n#Roastly #Grok #AI #Roast`;
-      if (postCaption.length > 280) {
-        postCaption = postCaption.slice(0, 277) + "...";
-      }
-
-      const browserId = getOrCreateBrowserId();
-      const res = await fetch("/api/post-to-x", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-roastly-browser-id": browserId,
-        },
-        body: JSON.stringify({
-          text: postCaption,
-          imageBase64: cardBase64,
-        }),
-      });
-
-      let data: any = {};
-      try {
-        data = await res.json();
-      } catch (jsonErr) {
-        console.error("Failed to parse post-to-x response as JSON:", jsonErr);
-      }
-
-      if (res.ok && data.success) {
-        alert(`Posted to X! View: ${data.url || "Check your X account"}`);
+      const result = await startCheckout(priceId, styleIntent ? 'style_lock' : 'upgrade_modal');
+      if (result.url) {
+        setShowUpgrade(false);
+        window.location.href = result.url;
       } else {
-        alert(data.error || `Failed to post to X (status ${res.status}). Make sure X API keys are configured in Vercel.`);
+        alert(result.error || 'Something went wrong');
       }
-    } catch (e) {
-      console.error(e);
-      alert("Network or unexpected error posting to X. Check console or X API setup.");
-    }
-  };
-
-  const copyReferralLink = () => {
-    const id = getOrCreateBrowserId();
-    const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-    navigator.clipboard.writeText(link);
-    alert("Referral link copied. Friends get bonus roasts when they pay.");
-  };
-
-  const copyViralXPost = () => {
-    const id = getOrCreateBrowserId();
-    const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-    const text = `Saucy Grok roasted this 🔥\n\nWorks on anything (screenshots, chats, photos).\n${link}\n\n#Roastly #Grok #AI`;
-    navigator.clipboard.writeText(text);
-    alert("Viral text copied — paste + attach your card image.");
-  };
-
-  // Checkout handler (same pattern as landing page)
-  // Small helper to keep usage labels consistent and DRY
-  const getUsageLabel = () => {
-    if (!usage) return "Loading...";
-    if (usage.remaining > 100000) return "Unlimited (owner)";
-    if (usage.isPaid) return `${usage.remaining} roasts left today`;
-    return `${usage.remaining} free roasts remaining (3 total)`;
-  };
-
-  const handleCheckout = async (priceId: string) => {
-    if (!priceId) {
-      alert("This product isn't set up yet.");
-      return;
-    }
-
-    const isSubscription = priceId === STRIPE_PRICES.unlimited;
-    const productLabel = isSubscription ? "Unlimited Roasts ($19.99/mo)" : 
-      priceId === STRIPE_PRICES.starter ? "Starter ($0.99)" :
-      priceId === STRIPE_PRICES.popular ? "Popular Pack ($4.99)" :
-      priceId === STRIPE_PRICES.heavy ? "Heavy Roaster ($9.99)" :
-      priceId === STRIPE_PRICES.firstRoastSpecial ? "First Roast 12 for $0.99" :
-      priceId === STRIPE_PRICES.threeRoastSpecial ? "Third Roast 10 for $0.99" :
-      "selected pack";
-
-    const confirmMessage = `You are about to purchase the ${productLabel}.` + 
-      (isSubscription ? " This will be a recurring monthly charge." : " This is a one-time purchase.") +
-      " Do you want to continue?";
-
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-
-    setIsCheckingOut(priceId);
-
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
-      });
-
-      const data = await res.json();
-
-      if (data.url) {
-        setShowUpgradeModal(false);
-        window.location.href = data.url;
-      } else {
-        alert(data.error || "Something went wrong");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Failed to start checkout. Please try again.");
+    } catch (err) {
+      console.error(err);
+      alert('Failed to start checkout. Please try again.');
     } finally {
-      setIsCheckingOut(null);
+      setCheckingOut(null);
     }
   };
+
+  const unlockStyle = (id: string) => {
+    setStyleIntent(id);
+    setFirstRoastOffer(false);
+    setLimitBanner(false);
+    setShowUpgrade(true);
+  };
+
+  const customize = (
+    <div className="space-y-4 pt-2 border-t border-zinc-800/80">
+      {paid ? (
+        <div>
+          <p className="text-sm text-zinc-400 mb-2 text-center">Roast style</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {ROAST_STYLES.map((style) => {
+              const active = styleId === style.id;
+              return (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => {
+                    setStyleId(style.id);
+                    trackEvent('style_selected', { style: style.id });
+                  }}
+                  className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm font-medium transition-colors active:scale-[0.985] touch-manipulation border ${
+                    active ? 'text-white border-transparent' : 'bg-zinc-900 text-zinc-300 border-zinc-800 active:bg-zinc-800'
+                  }`}
+                  style={active ? { backgroundColor: style.accent, borderColor: style.accent } : undefined}
+                >
+                  <span className="mr-1" aria-hidden>{style.emoji}</span>
+                  {style.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-center">
+          <p className="text-[11px] text-zinc-500 leading-snug mb-2">Free uses Default. Tap a voice to unlock it.</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {ROAST_STYLES.filter((style) => style.paidOnly).map((style) => (
+              <button
+                key={style.id}
+                type="button"
+                onClick={() => unlockStyle(style.id)}
+                className="min-h-[40px] px-3 rounded-full text-xs font-medium bg-zinc-950 border border-zinc-800 text-zinc-300 touch-manipulation"
+              >
+                {style.emoji} {style.label} 🔒
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <p className="text-sm text-zinc-400 mb-2 text-center">Heat level</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {HEAT.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setVibe(option.value)}
+              className={`min-h-[44px] min-w-[72px] px-3.5 py-2 rounded-full text-sm font-medium transition-colors active:scale-[0.985] touch-manipulation ${
+                vibe === option.value
+                  ? option.value === 'uplifting'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-red-600 text-white'
+                  : 'bg-zinc-800 text-zinc-300 active:bg-zinc-700'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {usage?.hasCustomPrompts ? (
+        <div>
+          <p className="text-sm text-emerald-400 mb-1 text-center">Custom instructions</p>
+          <textarea
+            value={customPrompt}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            placeholder="e.g. Focus on the awkward replies in this chat."
+            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-base text-white placeholder:text-zinc-500 min-h-[72px] resize-y"
+          />
+        </div>
+      ) : paid ? (
+        <div className="text-center">
+          <button type="button" onClick={() => setShowUpgrade(true)} className="text-xs text-emerald-400 hover:text-emerald-300 underline">
+            Unlock custom prompts for $1.99 →
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const goRoast = (source: string) => {
+    clearAuto();
+    if (usage && usage.remaining <= 0) setShowUpgrade(true);
+    else generate(source);
+  };
+
+  const activeStyle = getRoastStyle(styleId);
+  const pickedRoast = roasts[pickedIndex] ?? roasts[0];
+  const mobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="max-w-3xl mx-auto px-6 py-12">
-        <div className="text-center mb-10">
-          <h1 className="text-5xl font-bold tracking-tighter mb-4">
-            Let's do this.
-          </h1>
-          <p className="text-xl text-zinc-400">
-            Upload screenshots, photos, texts, X posts, pets — roast literally anything
-          </p>
+    <div className="min-h-screen bg-zinc-950 text-white pb-28 sm:pb-12">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 sm:py-12">
+        <div className={`text-center ${roasts.length > 0 ? 'mb-4' : 'mb-5 sm:mb-8'}`}>
+          {getJuly4PromoBanner() && !roasts.length && !previewUrl && (
+            <div className="mb-4 mx-auto max-w-lg px-3 py-2.5 rounded-2xl bg-red-950/60 border border-red-600/50 text-red-200 text-xs sm:text-base font-medium">
+              {getJuly4PromoBanner()}
+            </div>
+          )}
+          {paidBanner && roasts.length === 0 && (
+            <div className="mb-4 mx-auto max-w-lg px-3 py-2.5 rounded-2xl bg-emerald-950/60 border border-emerald-600/50 text-emerald-200 text-xs sm:text-sm font-medium">
+              Styles unlocked. Pick Gym Bro, British, Street… after you upload.
+            </div>
+          )}
+          {roasts.length === 0 && !previewUrl && (
+            <>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Built for group chats · under a few seconds</p>
+              <h1 className="text-3xl sm:text-5xl font-bold tracking-tighter mb-2 sm:mb-4">Upload. Get roasted. Drop it in the chat.</h1>
+              <p className="text-base sm:text-xl text-zinc-400 max-w-md mx-auto">Screenshot, selfie, group chat, pet — Grok cooks it fast</p>
+              <div className="flex justify-center gap-2 mt-4 text-[10px] sm:text-xs text-zinc-500">
+                <span className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">1. Upload</span>
+                <span className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">2. Roast</span>
+                <span className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">3. Send</span>
+              </div>
+            </>
+          )}
+          {roasts.length === 0 && previewUrl && !isGenerating && (
+            <p className="text-sm text-zinc-400">Looks good? Hit roast.</p>
+          )}
         </div>
 
-        {/* Results View */}
         {roasts.length > 0 && previewUrl ? (
           <div className="space-y-8">
-            <div className="mx-auto max-w-md">
-              <img 
-                src={previewUrl} 
-                alt="Your screenshot or image" 
-                className="w-full rounded-3xl shadow-2xl mb-8"
-              />
+            <div className="flex justify-center gap-2 text-[10px] sm:text-xs">
+              <span className="px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">1. Upload ✓</span>
+              <span className="px-2.5 py-1 rounded-full bg-red-600/20 text-red-300 border border-red-600/50 font-medium">2. Pick roast</span>
+              <span className="px-2.5 py-1 rounded-full bg-zinc-900 text-zinc-600 border border-zinc-800">3. Drop in chat</span>
             </div>
-
-            <div>
-              <h2 className="text-2xl font-semibold mb-4 text-center">
-                {vibe === 'uplifting' 
-                  ? 'Saucy Grok says something nice...' 
-                  : vibe === 'crispy' 
-                    ? 'Your Crispy roasts (nuclear edition)' 
-                    : vibe === 'medium_rare' 
-                      ? 'Your Medium Rare roasts' 
-                      : 'Your Light Toast roasts'}
-              </h2>
-              <div className="space-y-4">
-                <p className="text-xs text-zinc-500 text-center mb-2">Tap any roast to create the card. These are built for X — post them.</p>
-                {roasts.map((roast, index) => (
-                  <div 
-                    key={index} 
-                    onClick={() => {
-                      setSelectedRoastForCard(roast);
-                      setShowCard(true);
-                    }}
-                    className="bg-zinc-900 border border-zinc-800 hover:border-red-600 active:border-red-500 cursor-pointer rounded-2xl p-4 sm:p-5 text-base sm:text-lg min-h-[60px] transition-colors active:bg-zinc-800 touch-manipulation text-center whitespace-pre-line"
-                  >
-                    {roast}
+            <section>
+              <p className="text-center text-sm text-zinc-400 mb-4">Your card — {mobile ? 'share it' : 'copy it'} into the group chat</p>
+              <div
+                className={`bg-zinc-950 rounded-3xl border-2 ${vibe === 'uplifting' ? 'border-emerald-600/50' : 'border-red-600/40'} overflow-hidden`}
+                style={activeStyle.id !== 'default' && vibe !== 'uplifting' ? { borderColor: activeStyle.accent } : undefined}
+              >
+                {activeStyle.id !== 'default' && (
+                  <div className="pt-3 flex justify-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full text-zinc-950" style={{ backgroundColor: activeStyle.accent }}>
+                      {activeStyle.label}
+                    </span>
                   </div>
-                ))}
+                )}
+                <img src={previewUrl} alt="" className="w-full max-h-[180px] sm:max-h-[240px] object-cover" decoding="async" />
+                <div className="px-5 py-5 sm:px-7 sm:py-6 text-center whitespace-pre-line">
+                  <p className="text-white text-lg sm:text-2xl font-bold leading-snug tracking-tight">{pickedRoast}</p>
+                </div>
+                <div className="pb-4 text-center">
+                  <p className="text-[9px] text-zinc-600 tracking-[2px]">{vibe === 'uplifting' ? 'UPLIFTED BY' : 'ROASTED BY'}</p>
+                  <p className={`${vibe === 'uplifting' ? 'text-emerald-500' : 'text-red-500'} font-bold text-sm`}>SAUCY GROK</p>
+                </div>
               </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4">
-              <div className="text-xs sm:text-sm text-zinc-400 self-center text-center sm:text-left">
-                {getUsageLabel()}
+            </section>
+            <section>
+              <div className="flex items-center justify-between mb-3 px-1">
+                <p className="text-xs uppercase tracking-wider text-zinc-500">
+                  Choose your card ({activeStyle.id !== 'default' ? activeStyle.label : HEAT.find((h) => h.value === vibe)?.label})
+                </p>
+                <p className="text-xs text-zinc-600">{roasts.length} options</p>
+              </div>
+              <div className="space-y-2">
+                {roasts.map((roast, index) => {
+                  const active = pickedIndex === index;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setPickedIndex(index)}
+                      className={`w-full text-left rounded-2xl p-4 transition-colors touch-manipulation min-h-[56px] ${
+                        active ? 'bg-red-950/40 border-2 border-red-600/70' : 'bg-zinc-900/50 border border-zinc-800 active:bg-zinc-800/80'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5 ${active ? 'border-red-500 bg-red-600' : 'border-zinc-600'}`}>
+                          {active && <span className="w-2 h-2 rounded-full bg-white" />}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+                            {index === 0 ? (vibe === 'uplifting' ? 'Top pick' : 'Savagest') : `Option ${index + 1}`}
+                          </p>
+                          <p className={`text-sm sm:text-base leading-snug whitespace-pre-line ${active ? 'text-white' : 'text-zinc-300'}`}>{roast}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
               <button
-                onClick={handleRegenerate}
-                disabled={isGenerating}
-                className="min-h-[44px] bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-zinc-700 px-6 sm:px-8 py-3 rounded-2xl font-semibold text-sm sm:text-base transition-all active:scale-[0.985] touch-manipulation"
+                type="button"
+                onClick={async () => {
+                  setResultsShare('saving');
+                  try {
+                    const result = await shareOrCopyCard(previewUrl, pickedRoast, {
+                      isUplifting: vibe === 'uplifting',
+                      styleLabel: activeStyle.id === 'default' ? null : activeStyle.label,
+                      styleAccent: activeStyle.accent,
+                    });
+                    setResultsShare(result);
+                    trackEvent('share_group_chat', { style: styleId, source: 'results', method: result });
+                  } catch (err) {
+                    const e = err as { name?: string };
+                    setResultsShare(e?.name === 'AbortError' ? 'idle' : 'error');
+                  }
+                }}
+                disabled={resultsShare === 'saving'}
+                className="mt-5 w-full min-h-[56px] bg-red-600 active:bg-red-500 disabled:opacity-50 text-white font-bold rounded-2xl text-base touch-manipulation"
               >
-                {isGenerating ? "Generating..." : vibe === 'uplifting' ? "Regenerate Positives" : "Regenerate Roasts"}
+                {resultsShare === 'saving'
+                  ? mobile
+                    ? 'Opening share…'
+                    : 'Copying card…'
+                  : resultsShare === 'shared'
+                    ? 'Shared ✓'
+                    : resultsShare === 'copied'
+                      ? 'Copied ✓'
+                      : resultsShare === 'downloaded'
+                        ? 'Saved ✓'
+                        : shareButtonLabel()}
               </button>
               <button
-                onClick={resetUpload}
-                className="min-h-[44px] bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 px-6 sm:px-8 py-3 rounded-2xl font-semibold text-sm sm:text-base transition-all active:scale-[0.985] touch-manipulation"
+                type="button"
+                onClick={() => {
+                  setRoasts([]);
+                  generate('regenerate');
+                }}
+                disabled={isGenerating}
+                className="mt-2 w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 disabled:opacity-50 text-white font-semibold rounded-2xl text-sm touch-manipulation"
               >
-                Upload Different Image
+                {isGenerating ? 'Generating…' : 'Roast again'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoast(pickedRoast);
+                  setShowCard(true);
+                  trackEvent('roast_card_opened', { index: pickedIndex });
+                }}
+                className="w-full min-h-[40px] text-xs text-zinc-500 active:text-zinc-300 touch-manipulation"
+              >
+                Preview full card
+              </button>
+              {!paid && (
+                <div className="mt-4 rounded-2xl border border-zinc-800/80 bg-zinc-900/40 px-3 py-3">
+                  <p className="text-center text-[11px] text-zinc-500 mb-2">Same photo. Different voice.</p>
+                  <div className="flex gap-2 overflow-x-auto pb-0.5">
+                    {ROAST_STYLES.filter((s) => s.paidOnly).map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        onClick={() => {
+                          trackEvent('style_lock_tapped', { style: style.id });
+                          unlockStyle(style.id);
+                        }}
+                        className="shrink-0 min-h-[40px] px-3 rounded-full text-xs font-medium bg-zinc-950 border border-zinc-800 text-zinc-300 active:bg-zinc-800 touch-manipulation"
+                      >
+                        <span className="mr-1" aria-hidden>{style.emoji}</span>
+                        {style.label}
+                        <span className="ml-1 text-zinc-600">🔒</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-center text-[10px] text-zinc-600 mt-2">$1 unlocks every style · one-time</p>
+                </div>
+              )}
+            </section>
+            <section className="space-y-3 pt-4 border-t border-zinc-800/80">
+              <p className="text-xs text-zinc-500 text-center">{usageLabel()}</p>
+              <button onClick={resetUpload} className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 active:bg-zinc-800 text-zinc-400 rounded-xl text-sm touch-manipulation">
+                New photo
               </button>
               <button
                 onClick={() => {
-                  const vibes = ['crispy', 'medium_rare', 'light_toast', 'uplifting'] as const;
-                  const next = vibes[(vibes.indexOf(vibe) + 1) % vibes.length];
-                  setVibe(next);
-                  handleRegenerate();
+                  const idx = HEAT.findIndex((h) => h.value === vibe);
+                  setVibe(HEAT[(idx + 1) % HEAT.length].value);
+                  setRoasts([]);
+                  generate('regenerate');
                 }}
                 disabled={isGenerating}
-                className="min-h-[44px] bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-500 px-4 py-3 rounded-2xl text-xs sm:text-sm font-medium transition-all active:scale-[0.985] touch-manipulation"
+                className="w-full text-center text-xs text-zinc-600 py-1 touch-manipulation disabled:opacity-50"
               >
-                Different Vibe
+                Try a different vibe →
               </button>
-            </div>
-
-            {/* Soft, non-pushy upsell — only appears for free users after a great roast experience */}
-            {usage && !usage.isPaid && usage.remaining <= 2 && (
-              <div className="mt-6 text-center p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
-                <p className="text-sm text-zinc-400 mb-2">These roasts hitting? Get 10 fresh ones every day for the price of a coffee.</p>
-                <button 
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="text-emerald-400 hover:text-emerald-300 text-sm underline active:text-emerald-200"
-                >
-                  See $0.99 packs →
+              <div className="space-y-2">
+                <button type="button" onClick={() => setShowCustomize((v) => !v)} className="w-full text-center text-xs text-zinc-500 py-2 touch-manipulation">
+                  {showCustomize ? 'Hide customize ▲' : 'Customize heat / style ▼'}
                 </button>
+                {showCustomize && customize}
               </div>
-            )}
-
-            <div className="mt-4 text-center text-xs">
-              <button onClick={copyReferralLink} className="text-emerald-400 hover:text-emerald-300 underline active:text-emerald-200 mr-3">
-                Copy referral link
-              </button>
-              <button onClick={copyViralXPost} className="text-emerald-400 hover:text-emerald-300 underline active:text-emerald-200">
-                Copy viral X text
-              </button>
-            </div>
-
-            {usage && usage.remaining <= 0 && (
-              <div className="text-center mt-4 p-4 bg-zinc-900 rounded-2xl border border-zinc-700">
-                <p className="text-sm text-zinc-400 mb-2">
-                  {usage.isPaid 
-                    ? "You've used your 10 roasts for today." 
-                    : "You've used your 3 free roasts total."}
-                </p>
-                <button 
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="inline-block min-h-[44px] bg-emerald-600 active:bg-emerald-500 text-white px-6 py-2 rounded-2xl font-semibold text-sm transition-colors touch-manipulation"
+              {usage && (usage.freeRemaining ?? (usage.isPaid ? 0 : usage.remaining)) > 0 && (usage.freeRemaining ?? usage.remaining) <= 1 && (usage.credits ?? 0) === 0 && (
+                <p className="text-center text-xs text-zinc-500">Last free roast on this device</p>
+              )}
+              {(limitBanner || (usage && usage.remaining <= 0)) && (
+                <div className="p-4 bg-zinc-900 border border-zinc-700 rounded-2xl text-center">
+                  <p className="text-sm text-zinc-400 mb-3">
+                    {usage?.isPaid || (usage?.credits ?? 0) > 0 ? "You're out of roast credits." : 'Out of free roasts — grab a credit pack?'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setStyleIntent(null);
+                      setLimitBanner(!!(usage && usage.remaining <= 0));
+                      setShowUpgrade(true);
+                    }}
+                    className="w-full min-h-[48px] bg-red-600 active:bg-red-500 text-white rounded-2xl font-bold text-sm touch-manipulation"
+                  >
+                    Buy credit packs
+                  </button>
+                </div>
+              )}
+              <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/40 px-4 py-5 text-center">
+                <p className="text-xs text-zinc-500 mb-3">Know someone who needs roasting?</p>
+                <button
+                  onClick={() => {
+                    const link = `https://roastly-app.vercel.app/roast?ref=${getBrowserId()}`;
+                    navigator.clipboard.writeText(link);
+                    trackEvent('referral_copied');
+                    alert('Invite link copied! Friends get bonus roasts — you get +5 when they buy.');
+                  }}
+                  className="w-full min-h-[44px] bg-emerald-600/90 active:bg-emerald-500 text-white font-semibold rounded-xl text-sm touch-manipulation"
                 >
-                  Unlock more roasts →
+                  Invite friends — copy link
                 </button>
-                <p className="text-xs text-zinc-500 mt-2">Get 10 per day with any paid pack</p>
+                <p className="text-[10px] text-zinc-600 mt-2 leading-relaxed">Friends get bonus free roasts · you get +5 when they buy</p>
               </div>
-            )}
+            </section>
           </div>
-        ) : !previewUrl ? (
-          /* Upload Area — drag & drop + click, fast & delightful */
+        ) : previewUrl && isGenerating ? (
+          <div className="space-y-6 max-w-md mx-auto">
+            <div className="relative">
+              <img src={previewUrl} alt="Preview" className="w-full rounded-3xl shadow-2xl opacity-60" decoding="async" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-3xl px-6">
+                <div className="w-12 h-12 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-white font-semibold text-lg text-center mb-4">{generatingMessage || 'Generating roasts...'}</p>
+                <div className="w-full max-w-xs">
+                  <div className="flex justify-between mb-2">
+                    {STEPS.map((step, i) => (
+                      <span key={step.key} className={`text-[10px] uppercase tracking-wide ${i <= stepIndex ? 'text-red-400 font-semibold' : 'text-zinc-600'}`}>
+                        {step.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-red-600 rounded-full transition-all duration-500 ease-out" style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-xs text-zinc-500">Usually a few seconds · hang tight</p>
+          </div>
+        ) : previewUrl ? (
+          <div className="space-y-5 max-w-md mx-auto">
+            <div className="relative">
+              <img src={previewUrl} alt="Preview" className="w-full rounded-3xl shadow-2xl" decoding="async" />
+              <button type="button" onClick={resetUpload} className="absolute top-4 right-4 bg-black/70 text-white px-4 py-2 rounded-full text-sm min-h-[44px] touch-manipulation active:bg-black/80">
+                Change photo
+              </button>
+            </div>
+            {error && <p className="text-red-400 text-sm bg-red-950/50 p-3 rounded-xl text-center leading-snug">{error}</p>}
+            <button
+              type="button"
+              onClick={() => goRoast('button')}
+              disabled={isGenerating}
+              className="w-full bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-zinc-700 transition-colors text-white text-xl font-bold min-h-[56px] px-8 py-4 rounded-2xl touch-manipulation active:scale-[0.985] shadow-lg shadow-red-900/30"
+            >
+              {usage && usage.remaining <= 0 ? 'Buy roast credits' : autoHint ? 'Roasting in a sec… tap to go now →' : 'Roast this →'}
+            </button>
+            <p className="text-center text-xs text-zinc-500">
+              {remainingLine() || usageLabel()}
+              {autoHint ? ' · auto-starting…' : ''}
+            </p>
+            {usage && usage.remaining <= 0 && (
+              <button type="button" onClick={() => setShowUpgrade(true)} className="w-full text-emerald-400 text-sm underline touch-manipulation min-h-[40px]">
+                See payment options →
+              </button>
+            )}
+            <button type="button" onClick={() => { clearAuto(); setShowCustomize((v) => !v); }} className="w-full text-center text-xs text-zinc-600 py-2 touch-manipulation">
+              {showCustomize ? 'Hide options ▲' : 'More options (heat, style) ▼'}
+            </button>
+            {showCustomize && customize}
+          </div>
+        ) : (
           <div
             onDrop={(e) => {
               e.preventDefault();
               const file = e.dataTransfer.files?.[0];
-              if (file && file.type.startsWith('image/')) {
-                setError("");
-                setSelectedFile(file);
-                const reader = new FileReader();
-                reader.onload = (event) => setPreviewUrl(event.target?.result as string);
-                reader.readAsDataURL(file);
-              }
+              if (file && file.type.startsWith('image/')) selectFile(file, 'drop');
             }}
             onDragOver={(e) => e.preventDefault()}
             onDragEnter={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-zinc-700 rounded-3xl p-8 sm:p-12 text-center hover:border-zinc-500 active:border-zinc-400 transition-colors"
+            className="border-2 border-dashed border-zinc-700 rounded-3xl p-5 sm:p-12 text-center hover:border-red-600/50 active:border-red-500/50 transition-colors"
           >
-            <div className="mx-auto w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v-4m0 0V8m0 4h16m-8-4v8m-4 4h8" />
-              </svg>
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 mb-5 text-left">
+              <p className="text-[10px] text-red-400 uppercase tracking-wide mb-1">Example roast</p>
+              <p className="text-sm sm:text-base text-zinc-200 leading-snug">“That outfit is fighting for its life harder than your attempt to look rich.”</p>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Upload anything</h3>
-            <p className="text-zinc-400 mb-6">Photo, screenshot, text convo, meme, email, X post — drop it or tap</p>
-            
-            <label className="inline-block bg-white text-black px-8 py-3 min-h-[48px] rounded-2xl font-semibold cursor-pointer active:bg-zinc-100 transition-colors touch-manipulation">
-              Choose Image or Screenshot
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleFileSelect}
-                className="hidden" 
-              />
-            </label>
-            <p className="text-[10px] text-zinc-500 mt-4">Drag &amp; drop works too</p>
-          </div>
-        ) : (
-          /* Preview + Generate Button */
-          <div className="space-y-8">
-            <div className="relative mx-auto max-w-md">
-              <img 
-                src={previewUrl} 
-                alt="Preview" 
-                className="w-full rounded-3xl shadow-2xl"
-              />
-              <button 
-                onClick={resetUpload}
-                className="absolute top-4 right-4 bg-black/70 text-white px-4 py-2 rounded-full text-sm hover:bg-black min-h-[44px] min-w-[44px] touch-manipulation active:bg-black/80"
-              >
-                Change image
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex flex-col items-center justify-center w-full min-h-[100px] bg-red-600 active:bg-red-700 rounded-2xl font-bold text-base sm:text-lg cursor-pointer touch-manipulation transition-colors px-4">
+                <span className="text-2xl mb-1">🖼️</span>
+                <span>Choose photo or screenshot</span>
+                <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) selectFile(file, 'gallery'); e.target.value = ''; }} className="hidden" />
+              </label>
+              <label className="flex flex-col items-center justify-center w-full min-h-[100px] bg-zinc-800 active:bg-zinc-700 border border-zinc-600 rounded-2xl font-bold text-base sm:text-lg cursor-pointer touch-manipulation transition-colors px-4">
+                <span className="text-2xl mb-1">📸</span>
+                <span>Take a new photo</span>
+                <input type="file" accept="image/*" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) selectFile(file, 'camera'); e.target.value = ''; }} className="hidden" />
+              </label>
             </div>
-
-            <div className="space-y-6">
-              {/* Vibe Selector - optimized for mobile thumb tapping */}
-              <div>
-                <p className="text-sm text-zinc-400 mb-3 text-center">Choose the vibe</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[
-                    { value: 'crispy', label: 'Crispy' },
-                    { value: 'medium_rare', label: 'Medium Rare' },
-                    { value: 'light_toast', label: 'Light Toast' },
-                    { value: 'uplifting', label: 'Uplifting' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setVibe(option.value as any)}
-                      className={`min-h-[44px] min-w-[80px] px-4 py-2 rounded-full text-sm font-medium transition-colors active:scale-[0.985] ${
-                        vibe === option.value
-                          ? option.value === 'uplifting' 
-                            ? 'bg-emerald-600 text-white' 
-                            : 'bg-red-600 text-white'
-                          : 'bg-zinc-800 text-zinc-300 active:bg-zinc-700'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom prompt - unlocked via the $1.99 add-on (available on top of any paid tier) */}
-              {usage?.hasCustomPrompts ? (
-                <div>
-                  <p className="text-sm text-emerald-400 mb-1 text-center">Custom instructions (paid add-on)</p>
-                  <textarea
-                    value={customPrompt}
-                    onChange={(e) => setCustomPrompt(e.target.value)}
-                    placeholder="e.g. Roast this text convo like a savage stand-up comic. Focus on the awkward replies."
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-base text-white placeholder:text-zinc-500 min-h-[80px] resize-y"
-                  />
-                  <p className="text-[10px] text-zinc-500 mt-1 text-center">Your custom instructions will guide the roast style.</p>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <button
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 underline"
-                  >
-                    Unlock custom prompts for $1.99 (one-time add-on) →
-                  </button>
-                </div>
-              )}
-
-              <div className="text-center">
-                {error && (
-                  <p className="text-red-400 text-sm mb-4 bg-red-950/50 p-3 rounded-xl">
-                    {error}
-                  </p>
-                )}
-                <button
-                  onClick={handleGetRoasted}
-                  disabled={isGenerating}
-                  className="bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-zinc-700 transition-colors text-white text-xl font-semibold px-12 py-4 rounded-2xl touch-manipulation active:scale-[0.985]"
-                >
-                  {isGenerating 
-                    ? (generatingMessage || "Generating roasts...") 
-                    : usage && usage.remaining <= 0 
-                      ? (usage.isPaid ? "Daily limit reached — Upgrade" : "Free limit reached — Unlock more")
-                      : "Get Roasted →"}
-                </button>
-                <p className="text-xs text-zinc-500 mt-3">
-                  {getUsageLabel()}
-                </p>
-
-                {usage && usage.remaining <= 0 && (
-                  <div className="mt-3">
-                    <button 
-                      onClick={() => setShowUpgradeModal(true)}
-                      className="text-emerald-400 hover:text-emerald-300 text-sm underline"
-                    >
-                      See payment options to unlock more roasts →
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            <p className="text-xs text-zinc-500 mt-3">Free — {getFreeLimit()} roasts · no signup</p>
           </div>
         )}
       </div>
 
-      {/* Roast Card Modal */}
-      {showCard && previewUrl && selectedRoastForCard && (
+      {showCard && previewUrl && selectedRoast && (
         <RoastCard
+          key={`${selectedRoast}-${styleId}-${vibe}`}
           imageUrl={previewUrl}
-          roastText={selectedRoastForCard}
+          roastText={selectedRoast}
+          vibe={vibe}
+          styleId={paid ? styleId : DEFAULT_STYLE_ID}
           isUplifting={vibe === 'uplifting'}
           onClose={() => setShowCard(false)}
-          onPostToX={usage && usage.remaining > 100000 ? () => postToX(selectedRoastForCard) : undefined}
+          onPostToX={usage && usage.remaining > 100000 ? () => postCardToX(previewUrl, selectedRoast, vibe, styleId).catch((e) => { console.error(e); alert('Network or unexpected error posting to X.'); }) : undefined}
           isOwner={!!(usage && usage.remaining > 100000)}
+          onEngaged={() => {
+            if (firstRoastOffer) {
+              setFirstRoastOffer(false);
+              setShowUpgrade(true);
+            }
+          }}
+          onRoastAgain={() => {
+            setShowCard(false);
+            setSelectedRoast('');
+            setRoasts([]);
+            generate('regenerate');
+          }}
         />
       )}
 
-      {/* Upgrade / Pay Modal */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4">
-          <div className="bg-zinc-900 rounded-3xl max-w-lg w-full p-6 text-center">
-            <h2 className="text-2xl font-bold mb-2">
-              {usage?.isPaid ? "Daily limit reached" : "Free limit reached"}
-            </h2>
-            <p className="text-zinc-400 mb-6">
-              {usage?.isPaid 
-                ? "You've used all 10 roasts for today. Buy another pack or go Unlimited for ongoing access."
-                : "You've used your 3 free roasts (total). Any paid pack instantly unlocks 10 fresh roasts every single day."}
-            </p>
+      {showUpgrade && (
+        <UpgradeModal
+          usage={usage}
+          onClose={() => {
+            setShowUpgrade(false);
+            setFirstRoastOffer(false);
+            setLimitBanner(false);
+            setStyleIntent(null);
+          }}
+          onCheckout={checkout}
+          isCheckingOut={checkingOut}
+          showFirstRoastOffer={firstRoastOffer && !limitBanner && !styleIntent}
+          limitReached={!styleIntent && (limitBanner || !!(usage && usage.remaining <= 0))}
+          styleIntent={styleIntent}
+        />
+      )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-              {/* Starter */}
-              <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col">
-                <div className="text-2xl font-bold">$0.99</div>
-                <div className="text-sm text-zinc-400">Starter Pack</div>
-                <div className="text-xs mt-1 mb-3 text-zinc-500">Unlocks 10 roasts per day (one-time)</div>
-                <button
-                  onClick={() => handleCheckout(STRIPE_PRICES.starter)}
-                  disabled={isCheckingOut !== null}
-                  className="mt-auto min-h-[44px] bg-zinc-800 active:bg-zinc-700 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50 touch-manipulation"
-                >
-                  {isCheckingOut === STRIPE_PRICES.starter ? "Processing..." : "Buy Starter"}
-                </button>
-              </div>
-
-              {/* Popular - featured */}
-              <div className="bg-zinc-950 border-2 border-red-600 rounded-2xl p-4 flex flex-col relative">
-                <div className="absolute -top-2 right-3 bg-red-600 text-[10px] px-2 py-0.5 rounded-full font-medium">MOST POPULAR</div>
-                <div className="text-2xl font-bold">$4.99</div>
-                <div className="text-sm text-zinc-400">Popular Pack</div>
-                <div className="text-xs mt-1 mb-3 text-zinc-500">Unlocks 10 roasts per day (one-time)</div>
-                <button
-                  onClick={() => handleCheckout(STRIPE_PRICES.popular)}
-                  disabled={isCheckingOut !== null}
-                  className="mt-auto min-h-[44px] bg-red-600 active:bg-red-500 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50 touch-manipulation"
-                >
-                  {isCheckingOut === STRIPE_PRICES.popular ? "Processing..." : "Buy Popular Pack"}
-                </button>
-              </div>
-
-              {/* Heavy */}
-              <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col">
-                <div className="text-2xl font-bold">$9.99</div>
-                <div className="text-sm text-zinc-400">Heavy Roaster</div>
-                <div className="text-xs mt-1 mb-3 text-zinc-500">Unlocks 10 roasts per day (one-time)</div>
-                <button
-                  onClick={() => handleCheckout(STRIPE_PRICES.heavy)}
-                  disabled={isCheckingOut !== null}
-                  className="mt-auto min-h-[44px] bg-zinc-800 active:bg-zinc-700 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50 touch-manipulation"
-                >
-                  {isCheckingOut === STRIPE_PRICES.heavy ? "Processing..." : "Buy Heavy Pack"}
-                </button>
-              </div>
-
-              {/* Unlimited */}
-              <div className="bg-zinc-950 border border-emerald-600 rounded-2xl p-4 flex flex-col">
-                <div className="text-2xl font-bold">$19.99<span className="text-sm font-normal text-zinc-400">/mo</span></div>
-                <div className="text-sm text-emerald-400">Unlimited Roasts</div>
-                <div className="text-xs mt-1 mb-3 text-zinc-500">10 roasts per day, recurring</div>
-                <button
-                  onClick={() => handleCheckout(STRIPE_PRICES.unlimited)}
-                  disabled={isCheckingOut !== null}
-                  className="mt-auto min-h-[44px] bg-emerald-600 active:bg-emerald-500 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50 touch-manipulation"
-                >
-                  {isCheckingOut === STRIPE_PRICES.unlimited ? "Processing..." : "Get Unlimited"}
-                </button>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-zinc-500 mb-4">
-              One-time packs unlock the 10-roast daily cap on this browser/device. Unlimited Roasts is a recurring monthly subscription.
-            </p>
-
-            {/* $1.99 Custom Prompts Add-on (available on top of any paid tier) */}
-            <div className="mb-4 p-3 bg-zinc-950 border border-emerald-600 rounded-2xl text-left">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-emerald-400">Create Your Own Prompt — $1.99 one-time</div>
-                  <div className="text-xs text-zinc-400">Unlock the custom instructions box. Works with Starter, Popular, Heavy, or Unlimited.</div>
-                </div>
-                <button
-                  onClick={() => handleCheckout(STRIPE_PRICES.customPrompts)}
-                  disabled={isCheckingOut !== null}
-                  className="shrink-0 min-h-[44px] bg-emerald-600 active:bg-emerald-700 text-white px-4 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50 whitespace-nowrap transition-colors"
-                >
-                  {isCheckingOut === STRIPE_PRICES.customPrompts ? "..." : "Buy Add-on"}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => setShowUpgradeModal(false)}
-                className="flex-1 min-h-[44px] bg-zinc-800 active:bg-zinc-700 py-2.5 rounded-2xl text-sm transition-colors"
-              >
-                Maybe later
-              </button>
-              <button
-                onClick={() => setShowUpgradeModal(false)}
-                className="flex-1 min-h-[44px] bg-zinc-700 active:bg-zinc-600 py-2.5 rounded-2xl text-sm transition-colors"
-              >
-                Close
-              </button>
-            </div>
+      {previewUrl && !roasts.length && !isGenerating && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-zinc-950/95 border-t border-zinc-800 px-4 py-3 pb-safe backdrop-blur-md">
+          <button type="button" onClick={() => goRoast('sticky')} className="w-full min-h-[52px] bg-red-600 active:bg-red-500 text-white rounded-2xl font-bold text-base touch-manipulation">
+            {usage && usage.remaining <= 0 ? 'Buy credits →' : 'Roast this →'}
+          </button>
+        </div>
+      )}
+      {isGenerating && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-zinc-950/95 border-t border-zinc-800 px-4 py-3 pb-safe backdrop-blur-md">
+          <p className="text-center text-sm text-zinc-300 font-medium">{generatingMessage || 'Cooking your roast…'}</p>
+          <div className="mt-2 h-1 bg-zinc-800 rounded-full overflow-hidden max-w-xs mx-auto">
+            <div className="h-full bg-red-600 rounded-full transition-all duration-500" style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }} />
           </div>
         </div>
       )}

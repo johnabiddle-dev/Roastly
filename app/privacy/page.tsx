@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white px-6 py-12 max-w-2xl mx-auto">
@@ -14,7 +16,7 @@ export default function PrivacyPage() {
         </ul>
 
         <h2 className="text-2xl font-semibold mt-8">How we use it</h2>
-        <p>We use your image/screenshot only to generate roasts. We do not store images. We use usage data to enforce the free 3-roast limit and paid daily limits.</p>
+        <p>We use your image/screenshot only to generate roasts. We do not store images. We use usage data to enforce free-roast limits (3 for new users) and purchased roast credit balances.</p>
 
         <h2 className="text-2xl font-semibold mt-8">Payments</h2>
         <p>All payments are processed by Stripe. We receive confirmation of successful payments but no sensitive card data.</p>
@@ -24,7 +26,7 @@ export default function PrivacyPage() {
 
         <p className="text-sm text-zinc-500 mt-12">This is a simple policy for a small project. If you have questions, contact the owner via the site.</p>
       </div>
-      <a href="/" className="inline-block mt-8 text-red-400 hover:text-red-300">← Back to Roastly</a>
+      <Link href="/" className="inline-block mt-8 text-red-400 hover:text-red-300">← Back to Roastly</Link>
     </div>
   );
 }

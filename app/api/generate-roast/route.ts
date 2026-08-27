@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserId, getUsage, consumeOneRoast } from "@/lib/usage";
+import { normalizeImageBase64, toDataUrl } from "@/lib/image";
+import { DEFAULT_STYLE_ID, getRoastStyle, type RoastStyleId } from "@/lib/roast-styles";
 
-// Very basic in-memory rate limiter (max 5 roast generations per minute per identifier)
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 function getRateLimitKey(req: NextRequest): string {
@@ -15,7 +19,7 @@ function checkRateLimit(key: string): boolean {
   const record = rateLimitStore.get(key);
 
   if (!record || now > record.resetTime) {
-    rateLimitStore.set(key, { count: 1, resetTime: now + 60 * 1000 }); // 1 minute window
+    rateLimitStore.set(key, { count: 1, resetTime: now + 60 * 1000 });
     return true;
   }
 
@@ -27,67 +31,26 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const { imageBase64, vibe = "crispy", customPrompt } = await request.json();
-
-    if (!imageBase64) {
-      return NextResponse.json({ error: "No image provided" }, { status: 400 });
+function xaiErrorMessage(status: number, body: unknown): string {
+  if (body && typeof body === "object") {
+    const err = (body as { error?: unknown; message?: unknown }).error;
+    if (typeof err === "string" && err.trim()) return err.trim().slice(0, 500);
+    if (err && typeof err === "object") {
+      const nested = err as { message?: unknown; code?: unknown };
+      if (typeof nested.message === "string" && nested.message.trim()) {
+        return nested.message.trim().slice(0, 500);
+      }
     }
+    const message = (body as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message.trim().slice(0, 500);
+  }
+  if (typeof body === "string" && body.trim()) return body.trim().slice(0, 500);
+  return `xAI HTTP ${status}`;
+}
 
-    // Basic size limit to prevent abuse / high costs (5MB base64 ~3.7MB image)
-    if (typeof imageBase64 === 'string' && imageBase64.length > 5_000_000) {
-      return NextResponse.json({ error: "Image too large" }, { status: 413 });
-    }
-
-    // Basic abuse protection
-    const rateKey = getRateLimitKey(request);
-    if (!checkRateLimit(rateKey)) {
-      return NextResponse.json(
-        { error: "You're generating roasts too quickly. Please wait a minute." },
-        { status: 429 }
-      );
-    }
-
-    // Enforce per-user daily/total caps (free=3 lifetime, paid=10/day) BEFORE hitting xAI (to avoid wasting API calls)
-    const userId = getUserId(request);
-    const preStatus = getUsage(userId);
-    if (preStatus.remaining <= 0) {
-      return NextResponse.json(
-        {
-          error: preStatus.isPaid ? "Daily limit reached" : "Free limit reached (3 total)",
-          used: preStatus.used,
-          remaining: preStatus.remaining,
-          limit: preStatus.limit,
-          isPaid: preStatus.isPaid,
-        },
-        { status: 429 }
-      );
-    }
-
-    // Gate custom prompts to users who purchased the $1.99 add-on (on top of a paid tier)
-    if (customPrompt && typeof customPrompt === 'string' && customPrompt.trim() && !preStatus.hasCustomPrompts) {
-      return NextResponse.json(
-        { error: "Custom prompts require the $1.99 one-time add-on. Please purchase it from the upgrade options." },
-        { status: 402 }
-      );
-    }
-
-    if (customPrompt && typeof customPrompt === 'string' && customPrompt.length > 500) {
-      return NextResponse.json({ error: "Custom prompt too long (max 500 chars)" }, { status: 400 });
-    }
-
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "xAI API key is not configured" },
-        { status: 500 }
-      );
-    }
-
-    const getSystemPrompt = (vibe: string) => {
-      if (vibe === 'crispy') {
-        return `SYSTEM PROMPT – Roastly CRISPY NUCLEAR MODE (Maximum Savage)
+function getSystemPrompt(vibe: string, styleDelta: string) {
+  if (vibe === "crispy") {
+    return `SYSTEM PROMPT – Roastly CRISPY NUCLEAR MODE (Maximum Savage)
 
 You are Roastly Nuclear — the most vicious, no-fucks-given viral roast machine on X for @RoastlyApp. Your only goal is to create short, brutally savage, hyper-specific roasts that destroy egos and go viral. Make them so accurate and cutting that people screenshot, share, and tag friends immediately.
 
@@ -112,10 +75,10 @@ Generate exactly 5 distinct roasts — each the single best roast for this photo
     "Roast text here",
     "..."
   ]
-}`;
-      }
+}${styleDelta ? `\n\n${styleDelta}` : ""}`;
+  }
 
-      const base = `You are a highly skilled AI roaster.
+  let roastPrompt = `You are a highly skilled AI roaster.
 
 You roast ANYTHING: photos of people/pets/food/objects, text message screenshots, X posts, group chats, dating profiles, emails, gym selfies, memes — anything.
 
@@ -148,48 +111,109 @@ Return ONLY valid JSON, nothing else:
   ]
 }`;
 
-      let roastPrompt = base;
+  switch (vibe) {
+    case "medium_rare":
+      roastPrompt += `\n\nMEDIUM RARE: Sharp, elegant, high-IQ savagery. Witty and cutting without being low-effort vulgar. Sophisticated shade that still stings hard.`;
+      break;
+    case "light_toast":
+      roastPrompt += `\n\nLIGHT TOAST: Playful but still mean. The kind of roast that makes the victim laugh first, then slowly realize how fucked they just got.`;
+      break;
+    case "uplifting":
+      roastPrompt += `\n\nUPLIFTING: Genuine hype and celebration. Still clever and specific. Make them feel seen and awesome. No shade at all.`;
+      break;
+    default:
+      roastPrompt += `\n\nDefault: Brutally funny with strong personality.`;
+  }
 
-      switch (vibe) {
-        case 'medium_rare':
-          roastPrompt += `\n\nMEDIUM RARE: Sharp, elegant, high-IQ savagery. Witty and cutting without being low-effort vulgar. Sophisticated shade that still stings hard.`;
-          break;
+  roastPrompt += `\n\nAnalyze the image/screenshot with extreme detail (read every word of text, study every visual element).
+Generate exactly 5 distinct roasts in the required JSON format. Keep every roast very short (3-6 lines max, under 25 words total) so the full text fits on the card image without cutoff. Use \\n for line breaks.`;
 
-        case 'light_toast':
-          roastPrompt += `\n\nLIGHT TOAST: Playful but still mean. The kind of roast that makes the victim laugh first, then slowly realize how fucked they just got.`;
-          break;
+  if (styleDelta) roastPrompt += `\n\n${styleDelta}`;
+  return roastPrompt;
+}
 
-        case 'uplifting':
-          roastPrompt += `\n\nUPLIFTING: Genuine hype and celebration. Still clever and specific. Make them feel seen and awesome. No shade at all.`;
-          break;
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { imageBase64, vibe = "crispy", customPrompt } = body;
+    const style = getRoastStyle(typeof body.style === "string" ? body.style : DEFAULT_STYLE_ID);
 
-        default:
-          roastPrompt += `\n\nDefault: Brutally funny with strong personality.`;
-      }
+    const image = normalizeImageBase64(imageBase64);
+    if ("error" in image) {
+      return NextResponse.json({ error: image.error }, { status: image.error === "No image provided" ? 400 : image.error === "Image too large" ? 413 : 400 });
+    }
 
-      roastPrompt += `\n\nAnalyze the image/screenshot with extreme detail (read every word of text, study every visual element).
-Generate exactly 5 distinct roasts in the required JSON format. Keep every roast very short (3-6 lines max, under 25 words total) so the full text fits on the card image without cutoff. Use \n for line breaks.`;
+    const rateKey = getRateLimitKey(request);
+    if (!checkRateLimit(rateKey)) {
+      return NextResponse.json(
+        { error: "You're generating roasts too quickly. Please wait a minute." },
+        { status: 429 }
+      );
+    }
 
-      return roastPrompt;
-    };
+    const userId = getUserId(request);
+    const preStatus = getUsage(userId);
+    if (preStatus.remaining <= 0) {
+      return NextResponse.json(
+        {
+          error: preStatus.isPaid || preStatus.credits > 0 ? "You're out of roast credits" : "Free limit reached (3 total)",
+          used: preStatus.used,
+          remaining: preStatus.remaining,
+          limit: preStatus.limit,
+          freeRemaining: preStatus.freeRemaining,
+          credits: preStatus.credits,
+          isPaid: preStatus.isPaid,
+        },
+        { status: 429 }
+      );
+    }
 
-    let systemPrompt = getSystemPrompt(vibe);
+    const canUsePaidStyle = preStatus.isPaid || preStatus.credits > 0 || preStatus.remaining > 100000;
+    if (style.paidOnly && !canUsePaidStyle) {
+      return NextResponse.json(
+        {
+          error: "Roast styles (Gym Bro, British, Street, and more) unlock with a credit pack. Free roasts use Default only.",
+          code: "STYLE_REQUIRES_PAID",
+        },
+        { status: 402 }
+      );
+    }
 
-    // If user provided a custom prompt (paid-only feature), incorporate it
-    if (customPrompt && typeof customPrompt === 'string' && customPrompt.trim()) {
+    if (customPrompt && typeof customPrompt === "string" && customPrompt.trim() && !preStatus.hasCustomPrompts) {
+      return NextResponse.json(
+        { error: "Custom prompts require the $1.99 one-time add-on. Please purchase it from the upgrade options." },
+        { status: 402 }
+      );
+    }
+
+    if (customPrompt && typeof customPrompt === "string" && customPrompt.length > 500) {
+      return NextResponse.json({ error: "Custom prompt too long (max 500 chars)" }, { status: 400 });
+    }
+
+    const apiKey = process.env.XAI_API_KEY;
+    if (!apiKey) {
+      console.error("[generate-roast] XAI_API_KEY is not configured");
+      return NextResponse.json(
+        { error: "Failed to generate roasts: xAI API key is not configured" },
+        { status: 500 }
+      );
+    }
+
+    let systemPrompt = getSystemPrompt(vibe, style.systemDelta);
+    if (customPrompt && typeof customPrompt === "string" && customPrompt.trim()) {
       systemPrompt += `\n\nAdditional custom instructions from the user (follow these closely while staying in character):\n${customPrompt.trim()}`;
     }
 
-    const userPromptText = (vibe === 'uplifting'
-      ? `Give super positive, specific, hype feedback based on the uploaded image/screenshot. Celebrate the actual details you see. Make it feel special. Here is the image:`
-      : vibe === 'crispy'
-        ? `Roast this photo. Generate exactly 5 distinct nuclear savage roasts — max 220 characters each, roast text only, different angle each. Be fast and brutal. Here is the image:`
-        : `Analyze the image/screenshot in extreme detail. Generate 5 roasts exactly following the Roastly style and instructions in the system prompt. Keep each roast very short (3-6 lines, under 25 words total) so the full text fits perfectly on the card image. Here is the image:`) +
-      (customPrompt && typeof customPrompt === 'string' && customPrompt.trim()
+    const userPromptText =
+      (vibe === "uplifting"
+        ? `Give super positive, specific, hype feedback based on the uploaded image/screenshot. Celebrate the actual details you see. Make it feel special. Here is the image:`
+        : vibe === "crispy"
+          ? `Roast this photo. Generate exactly 5 distinct nuclear savage roasts — max 220 characters each, roast text only, different angle each. Be fast and brutal. Here is the image:`
+          : `Analyze the image/screenshot in extreme detail. Generate 5 roasts exactly following the Roastly style and instructions in the system prompt. Keep each roast very short (3-6 lines, under 25 words total) so the full text fits perfectly on the card image. Here is the image:`) +
+      (customPrompt && typeof customPrompt === "string" && customPrompt.trim()
         ? `\n\nFollow these custom instructions exactly while staying in character: ${customPrompt.trim()}`
-        : '');
+        : "");
 
-    // grok-4.3 rejects frequency_penalty, presence_penalty, and search_parameters (deprecated).
     const xaiBody: Record<string, unknown> = {
       model: "grok-4.3",
       messages: [
@@ -200,39 +224,53 @@ Generate exactly 5 distinct roasts in the required JSON format. Keep every roast
             { type: "text", text: userPromptText },
             {
               type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+              image_url: { url: toDataUrl(image) },
             },
           ],
         },
       ],
-      temperature: vibe === 'crispy' ? 1.1 : 0.96,
-      top_p: vibe === 'crispy' ? 0.99 : 0.96,
-      max_tokens: vibe === 'crispy' ? 480 : 680,
+      temperature: vibe === "crispy" ? 1.1 : 0.96,
+      top_p: vibe === "crispy" ? 0.99 : 0.96,
+      max_tokens: vibe === "crispy" ? 480 : 680,
       response_format: { type: "json_object" },
-      // reasoning_effort "high" added ~25s latency; "none" keeps roasts fast.
-      reasoning_effort: 'none',
+      reasoning_effort: "none",
     };
 
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(xaiBody),
-    });
+    const callXai = async () =>
+      fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(xaiBody),
+        signal: AbortSignal.timeout(55_000),
+      });
+
+    let response = await callXai();
+    if (!response.ok && [429, 500, 502, 503].includes(response.status)) {
+      const firstError = await response.text().catch(() => "");
+      console.error("[generate-roast] xAI retryable error:", response.status, firstError.slice(0, 500));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      response = await callXai();
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorData: { error?: string | { message?: string } } = {};
+      let errorData: unknown = errorText;
       try {
         errorData = JSON.parse(errorText);
       } catch {
-        errorData = { error: errorText };
+        errorData = errorText;
       }
-      console.error("xAI API Error:", response.status, errorData);
+      const message = xaiErrorMessage(response.status, errorData);
+      console.error("[generate-roast] xAI API Error:", response.status, errorData);
       return NextResponse.json(
-        { error: "Failed to generate roasts" },
+        {
+          error: `Failed to generate roasts: ${message}`,
+          code: "XAI_ERROR",
+          status: response.status,
+        },
         { status: 500 }
       );
     }
@@ -245,72 +283,81 @@ Generate exactly 5 distinct roasts in the required JSON format. Keep every roast
     if (refusal) {
       console.error("[generate-roast] Grok refusal:", refusal);
       return NextResponse.json(
-        { error: "Grok refused to generate roasts. Try again or use a different photo." },
+        { error: `Failed to generate roasts: Grok refused (${String(refusal).slice(0, 300)})` },
         { status: 500 }
       );
     }
 
     if (!content) {
+      console.error("[generate-roast] Empty Grok content", { finish: data.choices?.[0]?.finish_reason, usage: data.usage });
       return NextResponse.json(
-        { error: "No response from Grok" },
+        { error: "Failed to generate roasts: No response from Grok" },
         { status: 500 }
       );
     }
 
-    // Try to parse the JSON response from Grok
-    let parsed;
+    let parsed: { roasts?: string[] };
     try {
-      let jsonString = content.trim();
-
-      // Strip common markdown code fences if the model still includes them
-      jsonString = jsonString.replace(/```(?:json)?\s*([\s\S]*?)\s*```/gi, '$1').trim();
-
-      // Extract the first JSON object (defensive)
+      let jsonString = String(content).trim();
+      jsonString = jsonString.replace(/```(?:json)?\s*([\s\S]*?)\s*```/gi, "$1").trim();
       const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonString = jsonMatch[0];
-      }
-
+      if (jsonMatch) jsonString = jsonMatch[0];
       parsed = JSON.parse(jsonString);
     } catch {
-      console.error("Failed to parse Grok response as JSON:", content);
-
-      // Fallback: if model returned plain text instead of JSON, try to split into roast lines
-      const lines = (content || "")
+      console.error("[generate-roast] Failed to parse Grok JSON:", content);
+      const lines = String(content)
         .split(/\n+/)
-        .map((l: string) => l.trim().replace(/^[-*•\d.\)\s"']+/, "").replace(/"\s*$/, "").trim())
-        .filter((l: string) => l.length > 15 && l.length < 400);
+        .map((line: string) => line.trim().replace(/^[-*•\d.\)\s"']+/, "").replace(/"\s*$/, "").trim())
+        .filter((line: string) => line.length > 15 && line.length < 400);
 
       if (lines.length >= 1) {
-        console.log("[generate-roast] Using text fallback, extracted", lines.length, "roasts");
+        const consumeRes = consumeOneRoast(userId);
         return NextResponse.json({
           roasts: lines.slice(0, 5),
+          remaining: consumeRes.remaining,
+          freeRemaining: consumeRes.freeRemaining,
+          credits: consumeRes.credits,
+          style: style.id,
+          styleLabel: style.label,
         });
       }
 
-      // Include a preview of the actual response for debugging (will be visible in UI temporarily)
-      const preview = content ? content.substring(0, 500) : "(empty response)";
+      const preview = String(content).substring(0, 500);
       return NextResponse.json(
-        { error: `Failed to parse roast results. Grok returned: ${preview}` },
+        { error: `Failed to generate roasts: could not parse Grok JSON. Preview: ${preview}` },
         { status: 500 }
       );
     }
 
-    // Consume the roast quota only after we successfully got results from the AI.
-    // (If a race with another request crossed the limit during the AI call, we still deliver
-    // the roast the user waited for; slight overage possible but rare.)
-    const consumeRes = consumeOneRoast(userId);
-    if (!consumeRes.allowed) {
-      console.log("[generate-roast] Race condition: delivered roast after limit crossed for user", userId);
+    const roasts = Array.isArray(parsed.roasts)
+      ? parsed.roasts.map((roast) => String(roast).trim()).filter(Boolean).slice(0, 5)
+      : [];
+
+    if (roasts.length === 0) {
+      return NextResponse.json(
+        { error: "Failed to generate roasts: Grok returned no roast lines" },
+        { status: 500 }
+      );
     }
 
+    const consumeRes = consumeOneRoast(userId);
     return NextResponse.json({
-      roasts: parsed.roasts || [],
+      roasts,
+      remaining: consumeRes.remaining,
+      freeRemaining: consumeRes.freeRemaining,
+      credits: consumeRes.credits,
+      style: style.id as RoastStyleId,
+      styleLabel: style.label,
     });
-  } catch (error: any) {
-    console.error("Generate roast error:", error);
+  } catch (error: unknown) {
+    const err = error as { name?: string; message?: string };
+    console.error("[generate-roast] Generate roast error:", error);
+    const message =
+      err?.name === "TimeoutError" || err?.name === "AbortError"
+        ? "xAI timed out"
+        : err?.message || "Something went wrong";
     return NextResponse.json(
-      { error: error.message || "Something went wrong" },
+      { error: `Failed to generate roasts: ${message}` },
       { status: 500 }
     );
   }
