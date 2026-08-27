@@ -1,332 +1,189 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { STRIPE_PRICES } from '@/lib/stripe';
+import { useState } from 'react';
+import { CREDIT_PACKS, STRIPE_PRICES } from '@/lib/stripe';
+import { getFreeLimit, getJuly4PromoBanner } from '@/lib/promo';
+import { getBrowserId, startCheckout } from '@/lib/client';
+import { trackEvent } from '@/lib/analytics';
+
+const SAMPLES = [
+  { tag: 'GROUP CHAT', roast: 'The way y’all type like you’re being chased by punctuation is actually impressive.', rotate: '-rotate-3' },
+  { tag: 'SELFIE', roast: 'This is the photo equivalent of bringing a participation trophy to a gunfight.', rotate: 'rotate-2' },
+];
+
+const LANDING_PACKS = ['pack10', 'pack50', 'pack500'] as const;
 
 export default function RoastlyLanding() {
-  const [isLoading, setIsLoading] = useState<string | null>(null);
-  const [refLink, setRefLink] = useState('https://roastly-app.vercel.app/roast');
+  const [loading, setLoading] = useState<string | null>(null);
+  const free = getFreeLimit();
+  const packs = LANDING_PACKS.map((key) => CREDIT_PACKS.find((pack) => pack.key === key)).filter(Boolean);
 
-  const getOrCreateBrowserId = () => {
-    if (typeof window === "undefined") return "server";
-    let id = localStorage.getItem("roastly-browser-id");
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem("roastly-browser-id", id);
-    }
-    return id;
-  };
-
-  // Set ref link after mount to avoid hydration mismatch (server vs client localStorage)
-  useEffect(() => {
-    const id = getOrCreateBrowserId();
-    setRefLink(`https://roastly-app.vercel.app/roast?ref=${id}`);
-  }, []);
-
-  const handleUploadClick = () => {
-    // The real flow is at /roast. This button just scrolls or links for marketing.
-    window.location.href = '/roast';
-  };
-
-  const handleCheckout = async (priceId: string) => {
-    if (!priceId) {
-      alert("This product isn't set up yet.");
-      return;
-    }
-
-    const isSubscription = priceId === STRIPE_PRICES.unlimited;
-    const productLabel = isSubscription ? "Unlimited Roasts ($19.99/mo)" : 
-      priceId === STRIPE_PRICES.starter ? "Starter ($0.99)" :
-      priceId === STRIPE_PRICES.popular ? "Popular Pack ($4.99)" :
-      priceId === STRIPE_PRICES.heavy ? "Heavy Roaster ($9.99)" :
-      priceId === STRIPE_PRICES.customPrompts ? "Custom Prompts ($1.99)" : "selected pack";
-
-    const confirmMessage = `You are about to purchase the ${productLabel}.` + 
-      (isSubscription ? " This will be a recurring monthly charge." : " This is a one-time purchase.") +
-      " Do you want to continue?";
-
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-
-    setIsLoading(priceId);
-
+  const checkout = async (priceId: string) => {
+    setLoading(priceId);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
-      });
-
-      const data = await res.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || "Something went wrong");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Failed to start checkout. Please try again.");
+      const result = await startCheckout(priceId, 'landing');
+      if (result.url) window.location.href = result.url;
+      else alert(result.error || 'Something went wrong');
+    } catch {
+      alert('Failed to start checkout. Please try again.');
     } finally {
-      setIsLoading(null);
+      setLoading(null);
     }
   };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Hero with Roastable Background Images */}
-      <div className="relative flex flex-col items-center justify-center px-6 pt-20 pb-24 text-center overflow-hidden min-h-[85vh]">
-
-        {/* Dark overlay - placed FIRST */}
-        <div className="absolute inset-0 bg-zinc-950/80 z-10" />
-
-        {/* Background Images - placed AFTER the overlay */}
-        <div className="absolute inset-0 z-20 opacity-25">
-          {/* Image 1 - visible on mobile */}
-          <div className="absolute top-8 left-8 w-44 h-44 rotate-[-14deg] overflow-hidden rounded-3xl">
-            <img src="https://picsum.photos/id/1005/400/400" loading="lazy" className="w-full h-full object-cover" />
+      <div className="relative flex flex-col items-center px-4 sm:px-6 pt-14 sm:pt-20 pb-8 text-center">
+        <div className="relative z-10 max-w-xl w-full">
+          {getJuly4PromoBanner() && (
+            <div className="mb-4 mx-auto max-w-lg px-4 py-2.5 rounded-2xl bg-red-950/70 border border-red-500/60 text-red-100 text-sm font-semibold">
+              {getJuly4PromoBanner()}
+            </div>
+          )}
+          <div className="inline-block mb-3 px-3 py-1 rounded-full bg-zinc-900 text-xs text-zinc-400 border border-zinc-800">
+            Grok-powered · no signup · ~8 seconds
           </div>
-          {/* Image 2 - hidden on mobile for cleaner/faster load */}
-          <div className="absolute top-24 right-12 w-36 h-36 rotate-[11deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/1011/400/400" loading="lazy" className="w-full h-full object-cover" />
-          </div>
-          {/* Image 3 - visible on mobile */}
-          <div className="absolute top-48 left-24 w-40 h-40 rotate-[18deg] overflow-hidden rounded-3xl">
-            <img src="https://picsum.photos/id/160/400/400" loading="lazy" className="w-full h-full object-cover" />
-          </div>
-          {/* Image 4 - hidden on mobile */}
-          <div className="absolute bottom-20 right-20 w-48 h-48 rotate-[-8deg] overflow-hidden rounded-3xl hidden sm:block">
-            <img src="https://picsum.photos/id/201/400/400" loading="lazy" className="w-full h-full object-cover" />
-          </div>
-
-        </div>
-
-        {/* Hero Content */}
-        <div className="relative z-30 max-w-3xl">
-          <div className="inline-block mb-4 px-4 py-1 rounded-full bg-zinc-900 text-sm text-zinc-400 border border-zinc-800">
-            The most brutal AI roasts on the internet
-          </div>
-
-          <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter mb-6">
-            Roast anything.<br />Share the pain.
+          <h1 className="text-4xl sm:text-6xl font-bold tracking-tighter mb-3 leading-[1.05]">
+            Roast anything.<br />Drop it in the chat.
           </h1>
-
-          <p className="text-xl sm:text-2xl text-zinc-400 mb-10 max-w-xl mx-auto">
-            Upload screenshots, photos, group chats, X posts, pets, food, anything.<br />
-            Get brutally funny roasts from Grok in seconds. Share the card.
+          <p className="text-base sm:text-xl text-zinc-400 mb-6 max-w-md mx-auto">
+            Upload a screenshot, selfie, or group chat. Get 5 burns. Send the card. That&apos;s the whole product.
           </p>
-
-          <a 
+          <a
             href="/roast"
-            className="inline-block min-h-[52px] bg-red-600 active:bg-red-700 transition-all text-white text-lg sm:text-xl font-semibold px-8 sm:px-10 py-3 sm:py-4 rounded-2xl active:scale-[0.985] touch-manipulation"
+            onClick={() => trackEvent('landing_cta_clicked', { spot: 'hero' })}
+            className="inline-flex items-center justify-center w-full sm:w-auto min-h-[56px] bg-red-600 active:bg-red-700 transition-all text-white text-lg sm:text-xl font-bold px-8 sm:px-10 py-3 sm:py-4 rounded-2xl active:scale-[0.985] touch-manipulation shadow-lg shadow-red-900/30"
           >
-            Roast anything with Grok →
+            Try {free} free roasts →
           </a>
-
-          <p className="mt-4 text-sm text-zinc-500">
-            Free: 3 roasts • Then $0.99 packs for 10/day. No spam.
-          </p>
+          <p className="mt-2.5 text-xs text-zinc-500">No account. If you want more later, packs start at $1 — one-time.</p>
         </div>
-
+        <div className="relative mt-10 w-full max-w-md h-56 sm:h-64 pointer-events-none">
+          {SAMPLES.map((sample, i) => (
+            <div
+              key={sample.tag}
+              className={`absolute left-1/2 w-[78%] -translate-x-1/2 rounded-3xl border-2 border-red-600/40 bg-zinc-950 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.55)] ${sample.rotate} ${i === 0 ? 'top-0 z-10' : 'top-8 z-20'}`}
+            >
+              <div className="h-16 sm:h-20 bg-gradient-to-br from-zinc-800 via-zinc-900 to-red-950/40" />
+              <div className="px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-red-400 mb-1">{sample.tag}</p>
+                <p className="text-sm font-bold leading-snug text-white">{sample.roast}</p>
+                <p className="mt-2 text-[8px] tracking-[2px] text-zinc-600">ROASTED BY</p>
+                <p className="text-red-500 text-[11px] font-bold">SAUCY GROK</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Example Roasts — diverse "roast anything" proof */}
-      <div className="max-w-3xl mx-auto px-6 pb-20">
-        <div className="text-center mb-10">
-          <p className="text-zinc-500 text-sm tracking-[3px] mb-2">REAL ROASTS. ANYTHING GOES.</p>
-          <h2 className="text-4xl font-semibold tracking-tight">Recent Roasts</h2>
+      <div className="max-w-xl mx-auto px-6 pb-12">
+        <div className="grid grid-cols-3 gap-2 text-center text-xs sm:text-sm text-zinc-400">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 px-2 py-3">
+            <p className="text-white font-semibold mb-0.5">1. Upload</p>
+            Photo or screenshot
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 px-2 py-3">
+            <p className="text-white font-semibold mb-0.5">2. Pick</p>
+            5 roast options
+          </div>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 px-2 py-3">
+            <p className="text-white font-semibold mb-0.5">3. Send</p>
+            Card → group chat
+          </div>
         </div>
+      </div>
 
-        <div className="space-y-3 sm:space-y-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6">
-            <p className="text-red-400 text-xs sm:text-sm mb-1">X POST SCREENSHOT</p>
+      <div className="max-w-3xl mx-auto px-6 pb-14">
+        <p className="text-center text-zinc-500 text-xs tracking-[3px] mb-5">ANYTHING GOES</p>
+        <div className="space-y-3">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5">
+            <p className="text-red-400 text-xs mb-1">X POST</p>
             <p className="text-base sm:text-lg">“This is the tweet equivalent of bringing a participation trophy to a gunfight.”</p>
           </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6">
-            <p className="text-red-400 text-xs sm:text-sm mb-1">GROUP CHAT</p>
-            <p className="text-base sm:text-lg">“The way y’all type like you’re being chased by punctuation is actually impressive.”</p>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6">
-            <p className="text-red-400 text-xs sm:text-sm mb-1">PET PHOTO</p>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5">
+            <p className="text-red-400 text-xs mb-1">PET PHOTO</p>
             <p className="text-base sm:text-lg">“This dog looks like it pays rent and still complains about it.”</p>
           </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6">
-            <p className="text-red-400 text-xs sm:text-sm mb-1">GYM SELFIE</p>
-            <p className="text-base sm:text-lg">“Bro really took a mirror pic like the weights personally betrayed him.”</p>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6">
-            <p className="text-red-400 text-xs sm:text-sm mb-1">DATING PROFILE</p>
-            <p className="text-base sm:text-lg">“‘Love to travel’ and the only stamp in your passport is from the airport Chili’s.”</p>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6">
-            <p className="text-red-400 text-xs sm:text-sm mb-1">FOOD PIC</p>
-            <p className="text-base sm:text-lg">“That plate looks like it lost a fight with a microwave and accepted its fate.”</p>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5">
+            <p className="text-red-400 text-xs mb-1">DATING PROFILE</p>
+            <p className="text-base sm:text-lg">“‘Love to travel’ and the only stamp in your passport is from the airport Chili&apos;s.”</p>
           </div>
         </div>
-
-        <p className="text-center text-zinc-500 text-xs sm:text-sm mt-6 sm:mt-8">
-          Screenshots, photos, convos, memes, pets, profiles — roast literally anything. Download the card and share it instantly.
-        </p>
-      </div>
-
-      {/* Pricing Section - Payment Portal */}
-      <div className="max-w-5xl mx-auto px-6 pb-24">
-        <div className="text-center mb-8 sm:mb-12">
-          <p className="text-red-400 text-xs sm:text-sm tracking-[3px] mb-2">PRICING</p>
-          <h2 className="text-3xl sm:text-5xl font-bold tracking-tighter">Roast more for less than a coffee</h2>
-          <p className="text-base sm:text-xl text-zinc-400 mt-3 sm:mt-4">One-time packs unlock 10 roasts per day on this device. Perfect for group chats and sending cards to friends.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Free */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col">
-            <div>
-              <p className="text-zinc-400 text-sm">FREE</p>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">$0</span>
-              </div>
-              <p className="text-zinc-400 mt-1">3 roasts to start</p>
-              <p className="text-xs text-zinc-400 mt-1">The participation trophy of roasting</p>
-            </div>
-            <a href="/roast" className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold text-center inline-block text-sm sm:text-base touch-manipulation">
-              Get Started Free
-            </a>
-          </div>
-
-          {/* Starter - $0.99 */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col">
-            <div>
-              <p className="text-zinc-400 text-sm">STARTER</p>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">$0.99</span>
-              </div>
-              <p className="text-zinc-400 mt-1">Unlocks 10 roasts per day</p>
-              <p className="text-xs text-zinc-400 mt-1">One session's worth of chaos</p>
-            </div>
-            <button
-              onClick={() => handleCheckout(STRIPE_PRICES.starter)}
-              disabled={isLoading !== null}
-              className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
-            >
-              {isLoading === STRIPE_PRICES.starter ? "Processing..." : "Buy Starter Pack"}
-            </button>
-          </div>
-
-          {/* Popular - $4.99 */}
-          <div className="bg-zinc-900 border-2 border-red-600 rounded-3xl p-6 flex flex-col relative">
-            <div className="absolute -top-3 right-4 bg-red-600 text-xs px-3 py-1 rounded-full font-medium">
-              MOST POPULAR
-            </div>
-            <div>
-              <p className="text-zinc-400 text-sm">POPULAR</p>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">$4.99</span>
-              </div>
-              <p className="text-zinc-400 mt-1">Unlocks 10 roasts per day</p>
-              <p className="text-xs text-zinc-400 mt-1">Most people start here. Best value.</p>
-            </div>
-            <button
-              onClick={() => handleCheckout(STRIPE_PRICES.popular)}
-              disabled={isLoading !== null}
-              className="mt-auto w-full min-h-[48px] bg-red-600 active:bg-red-500 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
-            >
-              {isLoading === STRIPE_PRICES.popular ? "Processing..." : "Buy Popular Pack"}
-            </button>
-          </div>
-
-          {/* Heavy User - $9.99 for 50 */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col">
-            <div>
-              <p className="text-zinc-400 text-sm">HEAVY USER</p>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">$9.99</span>
-              </div>
-              <p className="text-zinc-400 mt-1">Unlocks 10 roasts per day</p>
-              <p className="text-xs text-zinc-400 mt-1">For people with a lot of enemies (or one very annoying friend)</p>
-            </div>
-            <button
-              onClick={() => handleCheckout(STRIPE_PRICES.heavy)}
-              disabled={isLoading !== null}
-              className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
-            >
-              {isLoading === STRIPE_PRICES.heavy ? "Processing..." : "Buy Heavy Pack"}
-            </button>
-          </div>
-
-          {/* Unlimited Roasts - $19.99/mo */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col">
-            <div>
-              <p className="text-zinc-400 text-sm">UNLIMITED ROASTS</p>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">$19.99</span>
-                <span className="text-zinc-400">/mo</span>
-              </div>
-              <p className="text-zinc-400 mt-1">10 roasts per day</p>
-              <p className="text-xs text-emerald-400 mt-1">Best for heavy users</p>
-              <p className="text-xs text-zinc-400 mt-1">For when being an asshole is your full-time job</p>
-            </div>
-            <button
-              onClick={() => handleCheckout(STRIPE_PRICES.unlimited)}
-              disabled={isLoading !== null}
-              className="mt-auto w-full min-h-[48px] bg-zinc-800 active:bg-zinc-700 transition-colors text-white py-3 rounded-2xl font-semibold disabled:opacity-50 touch-manipulation"
-            >
-              {isLoading === STRIPE_PRICES.unlimited ? "Processing..." : "Get Unlimited"}
-            </button>
-          </div>
-        </div>
-
-        <p className="text-center text-[10px] sm:text-xs text-zinc-500 mt-6 sm:mt-8">
-          One-time packs = 10 roasts/day forever on this device. Unlimited = recurring. Add custom prompt style for $1.99.
-        </p>
-      </div>
-
-            {/* Share / Referral link section - key for getting more users */}
-      <div className="text-center mt-8 sm:mt-12 pb-8 sm:pb-12 border-t border-zinc-800 pt-6 sm:pt-8">
-        <p className="text-zinc-400 mb-2 text-sm sm:text-base font-medium">Share your link — friends get extra free roasts</p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
-          <a 
-            href={refLink}
-            className="text-red-400 hover:text-red-300 underline text-base sm:text-lg font-medium break-all"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="text-center mt-6">
+          <a
+            href="/roast"
+            onClick={() => trackEvent('landing_cta_clicked', { spot: 'examples' })}
+            className="inline-flex min-h-[48px] items-center justify-center bg-red-600 active:bg-red-500 text-white font-semibold px-8 py-3 rounded-2xl touch-manipulation"
           >
-            Your personal link
+            Roast something free →
           </a>
+        </div>
+      </div>
+
+      <div id="pricing" className="max-w-lg mx-auto px-4 sm:px-6 pb-16">
+        <div className="text-center mb-5">
+          <p className="text-zinc-500 text-xs tracking-[3px] mb-1.5">IF YOU WANT MORE</p>
+          <h2 className="text-2xl font-bold tracking-tight">One-time packs</h2>
+          <p className="text-sm text-zinc-500 mt-1.5">Credits + 6 styles · Apple Pay · nothing recurring</p>
+        </div>
+        <div className="space-y-2.5">
+          {packs.map((pack) =>
+            pack ? (
+              <button
+                key={pack.key}
+                type="button"
+                onClick={() => checkout(STRIPE_PRICES[pack.key])}
+                disabled={loading !== null}
+                className={`w-full min-h-[64px] flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left touch-manipulation disabled:opacity-50 ${
+                  pack.popular ? 'bg-red-950/50 border-2 border-red-600' : 'bg-zinc-900 border border-zinc-800 active:bg-zinc-800'
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-semibold">
+                    {pack.credits} roasts
+                    {pack.popular ? <span className="ml-2 text-[10px] uppercase tracking-wide text-red-400">popular</span> : null}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {pack.perRoastLabel}/roast · {pack.blurb}
+                  </p>
+                </div>
+                <span className="shrink-0 text-lg font-bold">{loading === STRIPE_PRICES[pack.key] ? '…' : pack.priceLabel}</span>
+              </button>
+            ) : null
+          )}
+        </div>
+        <p className="text-center text-[11px] text-zinc-600 mt-3">One-time on this device · Gym Bro, British, Street & more</p>
+        <p className="text-center text-xs text-zinc-400 mt-2 leading-relaxed">Credits live in this browser. Don&apos;t clear the site data or they vanish.</p>
+      </div>
+
+      <div className="text-center pb-8 px-4 border-t border-zinc-800 pt-6">
+        <p className="text-zinc-400 mb-2 text-sm font-medium">Share your link — friends get extra free roasts</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
           <button
+            type="button"
             onClick={() => {
-              const id = getOrCreateBrowserId();
-              const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-              navigator.clipboard.writeText(link);
-              alert("Referral link copied.");
+              navigator.clipboard.writeText(`https://roastly-app.vercel.app/roast?ref=${getBrowserId()}`);
+              alert('Referral link copied.');
             }}
-            className="min-h-[44px] bg-emerald-600 active:bg-emerald-700 text-white text-xs sm:text-sm px-4 py-2 rounded-2xl transition-colors font-semibold touch-manipulation"
+            className="min-h-[44px] bg-emerald-600 active:bg-emerald-700 text-white text-sm px-4 py-2 rounded-2xl font-semibold touch-manipulation"
           >
             Copy referral link
           </button>
-          <button
-            onClick={() => {
-              const id = getOrCreateBrowserId();
-              const link = `https://roastly-app.vercel.app/roast?ref=${id}`;
-              const text = `Saucy Grok roasted this 🔥\n\nWorks on anything.\n${link}\n\n#Roastly #Grok #AI`;
-              navigator.clipboard.writeText(text);
-              alert("X text copied.");
-            }}
-            className="min-h-[44px] bg-zinc-800 active:bg-zinc-700 text-white text-xs sm:text-sm px-4 py-2 rounded-2xl transition-colors font-semibold touch-manipulation"
-          >
-            Copy X text
-          </button>
         </div>
-        <p className="text-[10px] sm:text-xs text-zinc-500 mt-2">Friends get bonus roasts. You get +5 when they buy.</p>
+        <p className="text-[10px] text-zinc-500 mt-2">You get +5 credits when a friend buys</p>
       </div>
 
-      {/* Legal footer */}
-      <div className="text-center pb-8 text-xs text-zinc-500 border-t border-zinc-800 pt-6">
+      <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-zinc-950/95 border-t border-zinc-800 px-4 py-3 pb-safe backdrop-blur-md">
+        <a
+          href="/roast"
+          onClick={() => trackEvent('landing_cta_clicked', { spot: 'sticky' })}
+          className="flex min-h-[52px] items-center justify-center w-full bg-red-600 active:bg-red-500 text-white font-bold rounded-2xl touch-manipulation"
+        >
+          Try {free} free roasts →
+        </a>
+      </div>
+
+      <div className="text-center pb-24 sm:pb-8 text-xs text-zinc-500 border-t border-zinc-800 pt-6">
         <a href="/privacy" className="hover:text-zinc-400 mx-2">Privacy</a>
         <a href="/terms" className="hover:text-zinc-400 mx-2">Terms</a>
         <span className="mx-2">•</span>

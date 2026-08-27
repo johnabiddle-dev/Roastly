@@ -47,3 +47,14 @@ input:not([type="file"]) {
 .transition-all {
   transition: all 0.15s ease-out;
 }
+
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

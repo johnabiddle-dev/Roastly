@@ -1,0 +1,23 @@
+{
+  "name": "Roastly",
+  "short_name": "Roastly",
+  "description": "Upload anything. Get roasted. Drop the card in the group chat.",
+  "start_url": "/roast",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

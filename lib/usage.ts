@@ -1,11 +1,11 @@
-// Simple in-memory store for MVP (resets on server restart / across serverless instances)
-// In production we'll move this to Supabase or Vercel KV for reliable paid tracking
 import { NextRequest } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
+import { getFreeLimit } from "@/lib/promo";
+import { USAGE_VERSION } from "@/lib/constants";
+import type { UsageStatus } from "@/lib/types";
 
-// Compare two secrets in constant time so the owner key can't be recovered
-// via response-timing differences. Hashing first keeps the compared buffers
-// the same length regardless of input length.
+export type { UsageStatus };
+
 export function constantTimeEqual(a: string, b: string): boolean {
   const ah = createHash("sha256").update(a).digest();
   const bh = createHash("sha256").update(b).digest();
@@ -13,56 +13,39 @@ export function constantTimeEqual(a: string, b: string): boolean {
 }
 
 export type UsageRecord = {
-  freeUsed: number;           // total lifetime for free users
-  paidDailyUsed: number;      // daily for paid users
-  paidDate: string;           // YYYY-MM-DD
-  isPaid: boolean;            // true if user has active paid plan (any pack or unlimited)
-  hasCustomPrompts: boolean;  // true if user paid the $1.99 add-on to unlock custom prompts
-  referredBy?: string;        // browserId of the person who referred this user
-  bonusRoasts: number;        // extra roasts earned via referrals etc.
-  version?: string;           // for resetting counts on new versions
+  freeUsed: number;
+  credits: number;
+  isPaid: boolean;
+  hasCustomPrompts: boolean;
+  referredBy?: string;
+  version?: string;
 };
 
 export const usageStore = new Map<string, UsageRecord>();
 
-export function getToday() {
-  return new Date().toISOString().split("T")[0];
-}
-
-export const FREE_LIMIT = 3;
-export const PAID_DAILY_LIMIT = 10;
-
-export const USAGE_VERSION = 'v3';
-
-const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || '';
+const OWNER_BROWSER_ID = process.env.OWNER_BROWSER_ID || "";
 
 function isOwner(browserId: string): boolean {
-  const cleanBrowser = (browserId || '').trim();
-  const cleanOwner = (OWNER_BROWSER_ID || '').trim();
+  const cleanBrowser = (browserId || "").trim();
+  const cleanOwner = OWNER_BROWSER_ID.trim();
   return !!cleanOwner && constantTimeEqual(cleanBrowser, cleanOwner);
 }
 
 function getOrCreateRecord(userId: string): UsageRecord {
-  const today = getToday();
   let record = usageStore.get(userId);
   if (!record) {
     record = {
       freeUsed: 0,
-      paidDailyUsed: 0,
-      paidDate: today,
+      credits: 0,
       isPaid: false,
       hasCustomPrompts: false,
-      bonusRoasts: 0,
       version: USAGE_VERSION,
     };
     usageStore.set(userId, record);
   } else if (record.version !== USAGE_VERSION) {
-    // Reset free/paid counts for previous users when USAGE_VERSION is bumped.
-    // This is the standard way to globally reset counters for all users (free lifetime + paid daily).
-    // Keeps: isPaid, hasCustomPrompts, bonusRoasts, referredBy.
     record.freeUsed = 0;
-    record.paidDailyUsed = 0;
     record.version = USAGE_VERSION;
+    if (typeof record.credits !== "number") record.credits = 0;
   }
   return record;
 }
@@ -77,167 +60,93 @@ export function makeUserId(ip: string, browserId: string): string {
   return `${ip || "unknown"}:${browserId || "no-id"}`;
 }
 
-export function getUsage(userId: string) {
-  const today = getToday();
-  const browserId = userId.split(':')[1] || '';
-
-  // Owner bypass: permanent unlimited access (no daily limits, full features)
-  if (isOwner(browserId)) {
-    return {
-      used: 0,
-      remaining: 1000000,
-      limit: 1000000,
-      isPaid: true,
-      hasCustomPrompts: true,
-      bonusRoasts: 0,
-      referredBy: undefined,
-    };
-  }
-
-  const record = getOrCreateRecord(userId);
-
-  if (record.isPaid) {
-    if (record.paidDate !== today) {
-      record.paidDailyUsed = 0;
-      record.paidDate = today;
-    }
-    const bonus = record.bonusRoasts || 0;
-    const effectiveLimit = PAID_DAILY_LIMIT + bonus;
-    const remaining = Math.max(0, effectiveLimit - record.paidDailyUsed);
-    return {
-      used: record.paidDailyUsed,
-      remaining,
-      limit: effectiveLimit,
-      isPaid: true,
-      hasCustomPrompts: !!record.hasCustomPrompts,
-      bonusRoasts: bonus,
-      referredBy: record.referredBy,
-    };
-  } else {
-    const bonus = record.bonusRoasts || 0;
-    const effectiveLimit = FREE_LIMIT + bonus;
-    const remaining = Math.max(0, effectiveLimit - record.freeUsed);
-    return {
-      used: record.freeUsed,
-      remaining,
-      limit: effectiveLimit,
-      isPaid: false,
-      hasCustomPrompts: !!record.hasCustomPrompts,
-      bonusRoasts: bonus,
-      referredBy: record.referredBy,
-    };
-  }
+function ownerStatus(): UsageStatus {
+  return {
+    used: 0,
+    remaining: 1000000,
+    limit: 1000000,
+    freeRemaining: 1000000,
+    credits: 1000000,
+    isPaid: true,
+    hasCustomPrompts: true,
+    bonusRoasts: 0,
+  };
 }
 
-export function consumeOneRoast(userId: string): {
-  allowed: boolean;
-  error?: string;
-  used?: number;
-  remaining?: number;
-  limit?: number;
-  isPaid?: boolean;
-  hasCustomPrompts?: boolean;
-  bonusRoasts?: number;
-  referredBy?: string;
-} {
-  const today = getToday();
-  const browserId = userId.split(':')[1] || '';
+function toStatus(record: UsageRecord): UsageStatus {
+  const freeLimit = getFreeLimit();
+  const freeRemaining = Math.max(0, freeLimit - record.freeUsed);
+  const credits = Math.max(0, record.credits || 0);
+  return {
+    used: record.freeUsed,
+    remaining: freeRemaining + credits,
+    limit: freeLimit,
+    freeRemaining,
+    credits,
+    isPaid: !!record.isPaid || credits > 0,
+    hasCustomPrompts: !!record.hasCustomPrompts,
+    bonusRoasts: 0,
+    referredBy: record.referredBy,
+  };
+}
 
-  // Owner bypass: always allow, no consumption
+export function getUsage(userId: string): UsageStatus {
+  const browserId = userId.split(":")[1] || "";
+  if (isOwner(browserId)) return ownerStatus();
+  return toStatus(getOrCreateRecord(userId));
+}
+
+export function consumeOneRoast(userId: string): UsageStatus & { allowed: boolean; error?: string } {
+  const browserId = userId.split(":")[1] || "";
   if (isOwner(browserId)) {
-    return {
-      allowed: true,
-      used: 0,
-      remaining: 1000000,
-      limit: 1000000,
-      isPaid: true,
-      hasCustomPrompts: true,
-    };
+    return { allowed: true, ...ownerStatus() };
   }
 
   const record = getOrCreateRecord(userId);
+  const freeLimit = getFreeLimit();
+  const freeRemaining = Math.max(0, freeLimit - record.freeUsed);
+  const credits = Math.max(0, record.credits || 0);
 
-  if (record.isPaid) {
-    if (record.paidDate !== today) {
-      record.paidDailyUsed = 0;
-      record.paidDate = today;
-    }
-
-    const bonus = record.bonusRoasts || 0;
-    const effectiveLimit = PAID_DAILY_LIMIT + bonus;
-    if (record.paidDailyUsed >= effectiveLimit) {
-      return {
-        allowed: false,
-        error: "Daily limit reached",
-        used: record.paidDailyUsed,
-        remaining: 0,
-        limit: effectiveLimit,
-        isPaid: true,
-        hasCustomPrompts: !!record.hasCustomPrompts,
-      };
-    }
-
-    record.paidDailyUsed += 1;
-    const paidBonus = record.bonusRoasts || 0;
-    const paidEffectiveLimit = PAID_DAILY_LIMIT + paidBonus;
+  if (freeRemaining <= 0 && credits <= 0) {
     return {
-      allowed: true,
-      used: record.paidDailyUsed,
-      remaining: Math.max(0, paidEffectiveLimit - record.paidDailyUsed),
-      limit: paidEffectiveLimit,
-      isPaid: true,
-      hasCustomPrompts: !!record.hasCustomPrompts,
-    };
-  } else {
-    const bonus = record.bonusRoasts || 0;
-    const effectiveLimit = FREE_LIMIT + bonus;
-    if (record.freeUsed >= effectiveLimit) {
-      return {
-        allowed: false,
-        error: "Free limit reached (3 total)",
-        used: record.freeUsed,
-        remaining: 0,
-        limit: effectiveLimit,
-        isPaid: false,
-        hasCustomPrompts: !!record.hasCustomPrompts,
-      };
-    }
-
-    record.freeUsed += 1;
-    const freeBonus = record.bonusRoasts || 0;
-    const freeEffectiveLimit = FREE_LIMIT + freeBonus;
-    return {
-      allowed: true,
-      used: record.freeUsed,
-      remaining: Math.max(0, freeEffectiveLimit - record.freeUsed),
-      limit: freeEffectiveLimit,
-      isPaid: false,
-      hasCustomPrompts: !!record.hasCustomPrompts,
+      allowed: false,
+      error: record.isPaid || credits > 0 ? "You're out of roast credits" : "Free limit reached (3 total)",
+      ...toStatus(record),
+      remaining: 0,
+      freeRemaining: 0,
+      credits: 0,
     };
   }
+
+  if (freeRemaining > 0) {
+    record.freeUsed += 1;
+  } else {
+    record.credits = credits - 1;
+  }
+
+  return { allowed: true, ...toStatus(record) };
+}
+
+export function grantCredits(userId: string, amount: number) {
+  const record = getOrCreateRecord(userId);
+  record.credits = Math.max(0, record.credits || 0) + Math.max(0, amount);
+  record.isPaid = true;
 }
 
 export function markUserAsPaid(userId: string) {
   const record = getOrCreateRecord(userId);
   record.isPaid = true;
-  usageStore.set(userId, record);
-
-  // If this payer was referred, give the referrer bonus roasts
   creditReferrerOnPayment(userId, 5);
 }
 
 export function markCustomPromptsUnlocked(userId: string) {
   const record = getOrCreateRecord(userId);
   record.hasCustomPrompts = true;
-  usageStore.set(userId, record);
-
-  // Credit referrer if applicable
   creditReferrerOnPayment(userId, 5);
 }
 
 export function grantBonusRoasts(userId: string, amount: number) {
-  const record = getOrCreateRecord(userId);
-  record.bonusRoasts = (record.bonusRoasts || 0) + Math.max(0, amount);
+  grantCredits(userId, amount);
 }
 
 export function setReferredBy(userId: string, referrerId: string) {
@@ -249,7 +158,7 @@ export function setReferredBy(userId: string, referrerId: string) {
 
 function creditReferrerOnPayment(payerUserId: string, amount = 5) {
   const payerRecord = usageStore.get(payerUserId);
-  if (payerRecord && payerRecord.referredBy) {
-    grantBonusRoasts(payerRecord.referredBy, amount);
+  if (payerRecord?.referredBy) {
+    grantCredits(payerRecord.referredBy, amount);
   }
 }

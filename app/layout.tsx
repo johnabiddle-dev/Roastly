@@ -14,8 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roastly — Roast Anything with Grok AI",
-  description: "Upload screenshots, photos, texts, X posts, memes, pets — anything. Get elite brutal/funny roasts from Grok. Beautiful shareable cards in seconds. Free 3 roasts, then cheap packs.",
+  metadataBase: new URL("https://roastly-app.vercel.app"),
+  title: "Roastly — Roast anything, drop it in the chat",
+  description: "Upload a photo. Get 5 Grok burns. Send the card.",
+  applicationName: "Roastly",
+  manifest: "/manifest.json",
+  alternates: {
+    canonical: "https://roastly-app.vercel.app",
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -24,19 +30,30 @@ export const metadata: Metadata = {
     apple: "/favicon.ico",
   },
   openGraph: {
-    title: "Roastly — Roast Anything with Grok AI",
-    description: "Roast literally anything with Grok AI — screenshots, photos, convos, X posts, pets, food. Get viral cards instantly. Free to start.",
+    title: "Roastly — Roast anything, drop it in the chat",
+    description: "Upload a photo. Get 5 Grok burns. Send the card.",
+    url: "https://roastly-app.vercel.app",
     images: [
       {
-        url: "https://roastly-app.vercel.app/og.png",
+        url: "https://roastly-app.vercel.app/og.jpg",
+        width: 1080,
+        height: 1920,
+        alt: "Roastly roast card",
       },
     ],
     siteName: "Roastly",
+    type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Roastly — Roast Anything with Grok AI",
-    description: "Upload anything. Grok roasts it. Download the beautiful card and share. The best roasting app.",
+    title: "Roastly — Roast anything, drop it in the chat",
+    description: "Upload a photo. Get 5 Grok burns. Send the card.",
+    images: ["https://roastly-app.vercel.app/og.jpg"],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Roastly",
+    statusBarStyle: "black-translucent",
   },
 };
 
