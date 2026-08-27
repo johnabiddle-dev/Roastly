@@ -14,10 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://roastly-app.vercel.app"),
   title: "Roastly — Roast anything, drop it in the chat",
   description: "Upload a photo. Get 5 Grok burns. Send the card.",
   applicationName: "Roastly",
   manifest: "/manifest.json",
+  alternates: {
+    canonical: "https://roastly-app.vercel.app",
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
