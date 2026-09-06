@@ -211,7 +211,7 @@ export async function generateRoastCardImage(
   ctx.font = "500 20px system-ui, -apple-system, sans-serif";
   ctx.fillStyle = "#9ca3af";
   ctx.textAlign = "center";
-  ctx.fillText("send this to someone · roastly-app.vercel.app", CARD_WIDTH / 2, CARD_HEIGHT - 28);
+  ctx.fillText("Try 3 free roasts · roastly-app.vercel.app/share", CARD_WIDTH / 2, CARD_HEIGHT - 28);
 
   return canvas.toDataURL("image/jpeg", 0.88);
 }

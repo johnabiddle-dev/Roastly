@@ -2,6 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import ReferralCapture from "@/components/ReferralCapture";
+import {
+  APP_URL,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_TITLE,
+  SITE_NAME,
+} from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,13 +21,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://roastly-app.vercel.app"),
-  title: "Roastly — Roast anything, drop it in the chat",
-  description: "Upload a photo. Get 5 Grok burns. Send the card.",
-  applicationName: "Roastly",
+  metadataBase: new URL(APP_URL),
+  title: DEFAULT_TITLE,
+  description: DEFAULT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "Roastly",
+    "roast cards",
+    "roast anything",
+    "free roasts",
+    "AI roast",
+    "Grok roast",
+    "group chat roast",
+    "iMessage roast card",
+  ],
   manifest: "/manifest.json",
   alternates: {
-    canonical: "https://roastly-app.vercel.app",
+    canonical: APP_URL,
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
   icons: {
     icon: [
@@ -30,29 +51,21 @@ export const metadata: Metadata = {
     apple: "/favicon.ico",
   },
   openGraph: {
-    title: "Roastly — Roast anything, drop it in the chat",
-    description: "Upload a photo. Get 5 Grok burns. Send the card.",
-    url: "https://roastly-app.vercel.app",
-    images: [
-      {
-        url: "https://roastly-app.vercel.app/og.jpg",
-        width: 1080,
-        height: 1920,
-        alt: "Roastly roast card",
-      },
-    ],
-    siteName: "Roastly",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    url: APP_URL,
+    siteName: SITE_NAME,
     type: "website",
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Roastly — Roast anything, drop it in the chat",
-    description: "Upload a photo. Get 5 Grok burns. Send the card.",
-    images: ["https://roastly-app.vercel.app/og.jpg"],
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
   },
   appleWebApp: {
     capable: true,
-    title: "Roastly",
+    title: SITE_NAME,
     statusBarStyle: "black-translucent",
   },
 };
@@ -76,6 +89,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <ReferralCapture />
         {children}
         <Analytics />
       </body>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { generateRoastCardImage } from '@/lib/generate-card';
 import { getRoastStyle, type RoastStyleId } from '@/lib/roast-styles';
-import { groupChatCaption, shareButtonLabel, shareOrCopyCard } from '@/lib/share';
+import { copyInviteLink, groupChatCaption, shareButtonLabel, shareOrCopyCard } from '@/lib/share';
 import { getBrowserId } from '@/lib/client';
 import { getJuly4PromoHook } from '@/lib/promo';
 import { trackEvent } from '@/lib/analytics';
@@ -36,6 +36,7 @@ export default function RoastCard({
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [shareState, setShareState] = useState<'idle' | 'saving' | 'shared' | 'copied' | 'downloaded' | 'error'>('idle');
+  const [inviteState, setInviteState] = useState<'idle' | 'copied'>('idle');
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const engaged = useRef(false);
   const mobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
@@ -152,8 +153,11 @@ export default function RoastCard({
         <div className="flex justify-center gap-2 text-[10px] mb-1">
           <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">1. Upload ✓</span>
           <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">2. Pick ✓</span>
-          <span className="px-2 py-0.5 rounded-full bg-red-600/30 text-red-300 border border-red-600/40">3. Drop in chat</span>
+          <span className="px-2 py-0.5 rounded-full bg-red-600/30 text-red-300 border border-red-600/40">3. Send the card</span>
         </div>
+        <p className="text-center text-[11px] text-zinc-400">
+          Send this in iMessage or the group chat. They get 3 free roasts — if they buy, you get +5.
+        </p>
         <button
           onClick={share}
           disabled={!cardUrl || shareState === 'saving'}
@@ -161,12 +165,12 @@ export default function RoastCard({
         >
           {shareState === 'saving'
             ? mobile
-              ? 'Opening share…'
+              ? 'Opening iMessage…'
               : 'Copying card…'
             : shareState === 'shared'
-              ? 'Shared ✓'
+              ? 'Sent ✓'
               : shareState === 'copied'
-                ? 'Copied ✓'
+                ? 'Card copied ✓'
                 : shareState === 'downloaded'
                   ? 'Saved ✓'
                   : shareButtonLabel()}
@@ -182,29 +186,30 @@ export default function RoastCard({
         )}
         <button
           onClick={() => {
-            trackEvent('share_x_clicked', { source: 'intent' });
-            window.open(
-              `https://x.com/intent/tweet?text=${encodeURIComponent(groupChatCaption(roastText))}`,
-              '_blank',
-              'noopener,noreferrer'
-            );
-            markEngaged();
-          }}
-          className="w-full min-h-[44px] text-xs text-zinc-400 active:text-white touch-manipulation"
-        >
-          Post to X
-        </button>
-        <button
-          onClick={() => {
             const caption = groupChatCaption(roastText, style.id !== 'default' ? style.label : undefined);
             navigator.clipboard.writeText(caption);
             trackEvent('copy_share_text', { style: styleId });
             markEngaged();
-            alert('Caption copied — paste into iMessage / WhatsApp / X');
+            alert('Caption copied — paste into iMessage or the group chat.');
           }}
           className="w-full min-h-[44px] text-xs text-zinc-400 active:text-white touch-manipulation"
         >
-          Copy caption for group chat
+          Copy caption for iMessage
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              await copyInviteLink(getBrowserId());
+              setInviteState('copied');
+              trackEvent('referral_copied', { source: 'card' });
+              markEngaged();
+            } catch {
+              alert('Could not copy the invite link.');
+            }
+          }}
+          className="w-full min-h-[44px] text-xs text-emerald-400 active:text-emerald-300 touch-manipulation"
+        >
+          {inviteState === 'copied' ? 'Invite link copied ✓' : 'Copy invite link — +5 if they buy'}
         </button>
         <button
           onClick={submitFeature}

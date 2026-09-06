@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import RoastCard, { postCardToX } from '@/components/RoastCard';
 import UpgradeModal from '@/components/UpgradeModal';
 import { DEFAULT_STYLE_ID, ROAST_STYLES, getRoastStyle, isPaidUser, type RoastStyleId } from '@/lib/roast-styles';
-import { shareButtonLabel, shareOrCopyCard } from '@/lib/share';
+import { copyInviteLink, shareButtonLabel, shareOrCopyCard } from '@/lib/share';
 import { getBrowserId, startCheckout } from '@/lib/client';
 import { USAGE_VERSION } from '@/lib/constants';
 import type { UsageStatus } from '@/lib/types';
@@ -105,6 +105,7 @@ export default function RoastPage() {
   const [styleIntent, setStyleIntent] = useState<string | null>(null);
   const [pickedIndex, setPickedIndex] = useState(0);
   const [resultsShare, setResultsShare] = useState<'idle' | 'saving' | 'shared' | 'copied' | 'downloaded' | 'error'>('idle');
+  const [inviteState, setInviteState] = useState<'idle' | 'copied'>('idle');
 
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generatingRef = useRef(false);
@@ -527,10 +528,12 @@ export default function RoastPage() {
             <div className="flex justify-center gap-2 text-[10px] sm:text-xs">
               <span className="px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">1. Upload ✓</span>
               <span className="px-2.5 py-1 rounded-full bg-red-600/20 text-red-300 border border-red-600/50 font-medium">2. Pick roast</span>
-              <span className="px-2.5 py-1 rounded-full bg-zinc-900 text-zinc-600 border border-zinc-800">3. Drop in chat</span>
+              <span className="px-2.5 py-1 rounded-full bg-zinc-900 text-zinc-600 border border-zinc-800">3. Send the card</span>
             </div>
             <section>
-              <p className="text-center text-sm text-zinc-400 mb-4">Your card — {mobile ? 'share it' : 'copy it'} into the group chat</p>
+              <p className="text-center text-sm text-zinc-400 mb-4">
+                Your card — {mobile ? 'send it' : 'copy it'} to iMessage or the group chat
+              </p>
               <div
                 className={`bg-zinc-950 rounded-3xl border-2 ${vibe === 'uplifting' ? 'border-emerald-600/50' : 'border-red-600/40'} overflow-hidden`}
                 style={activeStyle.id !== 'default' && vibe !== 'uplifting' ? { borderColor: activeStyle.accent } : undefined}
@@ -608,16 +611,19 @@ export default function RoastPage() {
               >
                 {resultsShare === 'saving'
                   ? mobile
-                    ? 'Opening share…'
+                    ? 'Opening iMessage…'
                     : 'Copying card…'
                   : resultsShare === 'shared'
-                    ? 'Shared ✓'
+                    ? 'Sent ✓ — they get 3 free, you get +5 if they buy'
                     : resultsShare === 'copied'
-                      ? 'Copied ✓'
+                      ? 'Card copied ✓ — paste into iMessage'
                       : resultsShare === 'downloaded'
-                        ? 'Saved ✓'
+                        ? 'Saved ✓ — send it in the chat'
                         : shareButtonLabel()}
               </button>
+              <p className="mt-2 text-center text-[11px] text-zinc-500">
+                Send the card, not a post. Friend buys a pack ($1 / $4.99 / $19.99) → you get +5.
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -707,20 +713,24 @@ export default function RoastPage() {
                   </button>
                 </div>
               )}
-              <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/40 px-4 py-5 text-center">
-                <p className="text-xs text-zinc-500 mb-3">Know someone who needs roasting?</p>
+              <div className="rounded-2xl border border-emerald-800/60 bg-emerald-950/30 px-4 py-5 text-center">
+                <p className="text-sm font-semibold text-white mb-1">Send the card. Get +5 when they pay.</p>
+                <p className="text-xs text-zinc-400 mb-3">Friends land on 3 free roasts, then packs at $1 / $4.99 / $19.99.</p>
                 <button
-                  onClick={() => {
-                    const link = `https://roastly-app.vercel.app/roast?ref=${getBrowserId()}`;
-                    navigator.clipboard.writeText(link);
-                    trackEvent('referral_copied');
-                    alert('Invite link copied! Friends get bonus roasts — you get +5 when they buy.');
+                  onClick={async () => {
+                    try {
+                      await copyInviteLink(getBrowserId());
+                      setInviteState('copied');
+                      trackEvent('referral_copied', { source: 'results' });
+                    } catch {
+                      alert('Could not copy the invite link.');
+                    }
                   }}
                   className="w-full min-h-[44px] bg-emerald-600/90 active:bg-emerald-500 text-white font-semibold rounded-xl text-sm touch-manipulation"
                 >
-                  Invite friends — copy link
+                  {inviteState === 'copied' ? 'Invite link copied ✓' : 'Copy invite link — +5 if they buy'}
                 </button>
-                <p className="text-[10px] text-zinc-600 mt-2 leading-relaxed">Friends get bonus free roasts · you get +5 when they buy</p>
+                <p className="text-[10px] text-zinc-500 mt-2 leading-relaxed">No posting chores. iMessage / group chat is the growth loop.</p>
               </div>
             </section>
           </div>

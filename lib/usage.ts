@@ -91,9 +91,16 @@ function toStatus(record: UsageRecord): UsageStatus {
 }
 
 export function getUsage(userId: string): UsageStatus {
-  const browserId = userId.split(":")[1] || "";
+  const browserId = browserIdFromUserId(userId);
   if (isOwner(browserId)) return ownerStatus();
-  return toStatus(getOrCreateRecord(userId));
+  const record = getOrCreateRecord(userId);
+  const orphan = usageStore.get(browserId);
+  if (orphan && orphan !== record && (orphan.credits || 0) > 0) {
+    record.credits = Math.max(0, record.credits || 0) + orphan.credits;
+    record.isPaid = record.isPaid || orphan.isPaid;
+    orphan.credits = 0;
+  }
+  return toStatus(record);
 }
 
 export function consumeOneRoast(userId: string): UsageStatus & { allowed: boolean; error?: string } {
@@ -156,9 +163,23 @@ export function setReferredBy(userId: string, referrerId: string) {
   }
 }
 
+function browserIdFromUserId(userId: string): string {
+  const parts = userId.split(":");
+  return parts.length > 1 ? parts.slice(1).join(":") : userId;
+}
+
 function creditReferrerOnPayment(payerUserId: string, amount = 5) {
   const payerRecord = usageStore.get(payerUserId);
-  if (payerRecord?.referredBy) {
-    grantCredits(payerRecord.referredBy, amount);
+  const referrerBrowserId = payerRecord?.referredBy;
+  if (!referrerBrowserId) return;
+
+  let credited = false;
+  for (const [key, record] of usageStore) {
+    if (key === referrerBrowserId || browserIdFromUserId(key) === referrerBrowserId) {
+      record.credits = Math.max(0, record.credits || 0) + amount;
+      record.isPaid = true;
+      credited = true;
+    }
   }
+  if (!credited) grantCredits(referrerBrowserId, amount);
 }
