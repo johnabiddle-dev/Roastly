@@ -1,4 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { APP_URL } from '@/lib/site';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service · Roastly',
+  description: 'Roastly terms: 3 free roasts, one-time packs at $1 / $4.99 / $19.99, and no subscription.',
+  alternates: { canonical: `${APP_URL}/terms` },
+  robots: { index: true, follow: true },
+};
 
 export default function TermsPage() {
   return (

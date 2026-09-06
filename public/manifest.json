@@ -1,7 +1,7 @@
 {
   "name": "Roastly",
   "short_name": "Roastly",
-  "description": "Upload anything. Get roasted. Drop the card in the group chat.",
+  "description": "Roast anything. Send the card in iMessage. 3 free roasts, then $1 / $4.99 / $19.99 packs.",
   "start_url": "/roast",
   "scope": "/",
   "display": "standalone",

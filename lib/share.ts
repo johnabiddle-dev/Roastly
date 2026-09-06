@@ -1,5 +1,7 @@
 import { generateRoastCardImage, type CardOptions } from "@/lib/generate-card";
+import { getBrowserId } from "@/lib/client";
 import { getJuly4PromoHook } from "@/lib/promo";
+import { shareUrl } from "@/lib/site";
 
 function isMobileShare(): boolean {
   if (typeof navigator === "undefined" || !navigator.share) return false;
@@ -7,21 +9,32 @@ function isMobileShare(): boolean {
 }
 
 export function shareButtonLabel(): string {
-  return isMobileShare() ? "Share" : "Copy card";
+  return isMobileShare() ? "Send the card" : "Copy card for iMessage";
 }
 
-export function groupChatCaption(roastText: string, styleLabel?: string): string {
+export function inviteUrl(browserId?: string): string {
+  const ref = browserId || (typeof window !== "undefined" ? getBrowserId() : "");
+  return shareUrl(ref || null);
+}
+
+export function groupChatCaption(roastText: string, styleLabel?: string, browserId?: string): string {
   const hook = getJuly4PromoHook();
   const short = roastText.replace(/\n/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
   const style = styleLabel && styleLabel !== "Default" ? ` (${styleLabel} mode)` : "";
-  const caption = `${hook}Just got absolutely roasted by @RoastlyApp${style} 😂
+  const url = inviteUrl(browserId);
+  return `${hook}Just got roasted${style} 🔥
 
 "${short}"
 
-Send this to someone → https://roastly-app.vercel.app/roast
+Try 3 free roast cards → ${url}
+Friend buys a pack ($1 / $4.99 / $19.99) → I get +5. No subscription.`;
+}
 
-#Roastly #Grok`;
-  return caption.length > 280 ? caption.slice(0, 277) + "…" : caption;
+export function shareInviteText(browserId?: string): string {
+  return `Roast anything. Send the card in iMessage / group chat.
+
+Try 3 free roasts → ${inviteUrl(browserId)}
+Then packs $1 / $4.99 / $19.99 (one-time). If a friend buys, you get +5.`;
 }
 
 async function cardFile(imageUrl: string, roastText: string, options: boolean | CardOptions) {
@@ -72,11 +85,16 @@ export async function shareOrCopyCard(
   options: boolean | CardOptions = false
 ): Promise<"shared" | "copied" | "downloaded"> {
   const { file, dataUrl } = await cardFile(imageUrl, roastText, options);
+  const styleLabel =
+    typeof options === "object" && options?.styleLabel && options.styleLabel !== "Default"
+      ? options.styleLabel
+      : undefined;
+  const browserId = getBrowserId();
   if (isMobileShare() && navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
     await navigator.share({
       files: [file],
-      title: "Roastly Card",
-      text: "Roast them back → https://roastly-app.vercel.app/roast",
+      title: "Roastly card — send this in the chat",
+      text: groupChatCaption(roastText, styleLabel, browserId),
     });
     return "shared";
   }
@@ -92,4 +110,10 @@ export async function shareOrCopyCard(
     link.remove();
     return "downloaded";
   }
+}
+
+export async function copyInviteLink(browserId?: string): Promise<string> {
+  const url = inviteUrl(browserId);
+  await navigator.clipboard.writeText(url);
+  return url;
 }

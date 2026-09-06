@@ -1,4 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { APP_URL } from '@/lib/site';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy · Roastly',
+  description: 'How Roastly handles uploaded photos, roast credits, and Stripe payments.',
+  alternates: { canonical: `${APP_URL}/privacy` },
+  robots: { index: true, follow: true },
+};
 
 export default function PrivacyPage() {
   return (
